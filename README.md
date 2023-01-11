@@ -2,7 +2,13 @@
  
 > **Warning**: this is a work in progress Go client implementation for OpenAI's API.
 
+```console
+$ go get -v github.com/picatz/openai
+```
+
 ```go
+import "github.com/picatz/openai"
+
 client := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
 ```
 
