@@ -134,7 +134,7 @@ C = 37.78°C
 ```
 
 ```console
-$ openai % ~/.vscode/op-go-run.sh run cmd/openai/main.go ascii art cat           
+$ openai ascii art cat           
   \    /\
   )  ( ')
  (  /  )
