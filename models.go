@@ -151,6 +151,7 @@ const (
 
 	// Used for the CreateEdit API endpoint.
 	ModelTextDavinciEdit001 Model = "text-davinci-edit-001"
+	ModelCodeDavinciEdit001 Model = "code-davinci-edit-001"
 
 	// TODO: add more "known" models.
 )
