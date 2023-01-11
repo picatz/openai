@@ -1,4 +1,4 @@
-# openai
+# OpenAI
  
 > **Warning**: this is a work in progress Go client implementation for OpenAI's API.
 
@@ -45,4 +45,79 @@ resp, _ := client.CreateImage(ctx, &openai.CreateImageRequest{
 })
 
 fmt.Println(*resp.Data[0].URL)
+```
+
+### `openai` CLI
+
+Use OpenAI's edit and completion features on the command-line.
+
+```console
+$ go install github.com/picatz/openai/cmd/openai@latest
+```
+
+> **Note**: do not rely on this for reliable output.
+
+```console
+$ echo "1,2,3,4,5" | openai convert to JSON                  
+[1,2,3,4,5]
+```
+
+```console
+$ echo "hello world" | openai capitalize        
+Hello World
+```
+
+```console
+$ echo "eye lov golang" | openai spellcheck
+I love golang
+```
+
+```console
+$ openai list of 5 prime numbers
+2, 3, 5, 7, 11
+```
+
+```console
+$ openai name the two founders of apple          
+Steve Jobs and Steve Wozniak
+```
+
+```console
+$ openai what is command to show who is logged in on unix systems
+The command to show who is logged in on Unix systems is "who".
+```
+
+```console
+$ openai simple terraform resource for an AWS S3 bucket    
+resource "aws_s3_bucket" "my_s3_bucket" {
+  bucket = "my-s3-bucket"
+  acl    = "private"
+}
+```
+
+```console
+$ openai generate SSH key                           
+1. Open a terminal
+2. Run the ssh-keygen command
+3. Enter the desired file in which to save the key when prompted
+4. Enter a secure passphrase when prompted
+5. Your key will now be generated
+```
+
+```console
+$ openai generate SSH key PEM private key output
+-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEAz2HyiiLE...3n3h1fwuI1MGKNw==
+-----END RSA PRIVATE KEY-----
+```
+
+```console
+$ openai markdown table of prices                    
+| Item                        | Price  |
+| --------------------------- | ------ |
+| Apple                       | $1.00  |
+| Banana                      | $0.50  |
+| Orange                      | $0.75  |
+| Pear                        | $1.25  |
+| Pineapple                   | $2.00  |
 ```
