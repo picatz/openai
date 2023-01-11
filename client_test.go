@@ -16,7 +16,7 @@ func TestCreateCompletion(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	resp, err := c.CreateCompletion(ctx, nil, &openai.CreateCompletionRequest{
+	resp, err := c.CreateCompletion(ctx, &openai.CreateCompletionRequest{
 		Model:     openai.ModelDavinci,
 		Prompt:    []string{"This is a test"},
 		MaxTokens: 5,
@@ -39,7 +39,7 @@ func TestCreateEdit(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	resp, err := c.CreateEdit(ctx, nil, &openai.CreateEditRequest{
+	resp, err := c.CreateEdit(ctx, &openai.CreateEditRequest{
 		Model:       openai.ModelTextDavinciEdit001,
 		Instruction: "Change the word 'test' to 'example'",
 		Input:       "This is a test",
@@ -66,7 +66,7 @@ func TestCreateImage(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	resp, err := c.CreateImage(ctx, nil, &openai.CreateImageRequest{
+	resp, err := c.CreateImage(ctx, &openai.CreateImageRequest{
 		Prompt:         "Golang-style gopher mascot wearing an OpenAI t-shirt",
 		N:              1,
 		Size:           "256x256",

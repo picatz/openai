@@ -15,6 +15,36 @@ import (
 type Client struct {
 	// APIKey is the API key to use for requests.
 	APIKey string
+
+	// HTTPClient is the HTTP client to use for requests.
+	HTTPClient *http.Client
+
+	// Organization is the organization to use for requests.
+	Organization string
+}
+
+// ClientOption is a function that configures a Client.
+type ClientOption func(*Client)
+
+// WithHTTPClient is a ClientOption that sets the HTTP client to use for requests.
+//
+// If the client is nil, then http.DefaultClient is used
+func WithHTTPClient(c *http.Client) ClientOption {
+	return func(client *Client) {
+		if c == nil {
+			c = http.DefaultClient
+		}
+		client.HTTPClient = c
+	}
+}
+
+// WithOrganization is a ClientOption that sets the organization to use for requests.
+//
+// https://beta.openai.com/docs/api-reference/authentication
+func WithOrganization(org string) ClientOption {
+	return func(client *Client) {
+		client.Organization = org
+	}
 }
 
 // NewClient returns a new Client with the given API key.
@@ -22,10 +52,17 @@ type Client struct {
 // # Example
 //
 //	c := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
-func NewClient(apiKey string) *Client {
-	return &Client{
-		APIKey: apiKey,
+func NewClient(apiKey string, opts ...ClientOption) *Client {
+	c := &Client{
+		APIKey:     apiKey,
+		HTTPClient: http.DefaultClient,
 	}
+
+	for _, opt := range opts {
+		opt(c)
+	}
+
+	return c
 }
 
 // CreateCompletionRequest contains information for a "completion" request
@@ -147,18 +184,14 @@ type CompletionResponse struct {
 //
 // # Example
 //
-//	 resp, _ := client.CreateCompletion(ctx, nil, &openai.CreateCompletionRequest{
+//	 resp, _ := client.CreateCompletion(ctx, &openai.CreateCompletionRequest{
 //		Model: openai.ModelDavinci,
 //		Prompt: []string{"Once upon a time"},
 //		MaxTokens: 16,
 //	 })
 //
 // https://beta.openai.com/docs/api-reference/completions/create
-func (c *Client) CreateCompletion(ctx context.Context, h *http.Client, req *CreateCompletionRequest) (*CompletionResponse, error) {
-	if h == nil {
-		h = http.DefaultClient
-	}
-
+func (c *Client) CreateCompletion(ctx context.Context, req *CreateCompletionRequest) (*CompletionResponse, error) {
 	b, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
@@ -172,7 +205,11 @@ func (c *Client) CreateCompletion(ctx context.Context, h *http.Client, req *Crea
 	r.Header.Set("Authorization", "Bearer "+c.APIKey)
 	r.Header.Set("Content-Type", "application/json")
 
-	resp, err := h.Do(r)
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
 	if err != nil {
 		return nil, err
 	}
@@ -221,18 +258,14 @@ type Models struct {
 //
 // # Example
 //
-//	resp, _ := client.ListModels(ctx, nil)
+//	resp, _ := client.ListModels(ctx)
 //
 //	for _, model := range resp.Data {
 //	   fmt.Println(model.ID)
 //	}
 //
 // https://beta.openai.com/docs/api-reference/models/list
-func (c *Client) ListModels(ctx context.Context, h *http.Client) (*Models, error) {
-	if h == nil {
-		h = http.DefaultClient
-	}
-
+func (c *Client) ListModels(ctx context.Context) (*Models, error) {
 	r, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/models", nil)
 	if err != nil {
 		return nil, err
@@ -241,7 +274,11 @@ func (c *Client) ListModels(ctx context.Context, h *http.Client) (*Models, error
 	r.Header.Set("Authorization", "Bearer "+c.APIKey)
 	r.Header.Set("Content-Type", "application/json")
 
-	resp, err := h.Do(r)
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
 	if err != nil {
 		return nil, err
 	}
@@ -305,18 +342,14 @@ type CreateEditResponse struct {
 //
 // # Example
 //
-//	resp, _ := client.CreateEdit(ctx, nil, &CreateEditRequest{
+//	resp, _ := client.CreateEdit(ctx, &CreateEditRequest{
 //		Model:       openai.ModelTextDavinciEdit001,
 //		Instruction: "Change the word 'test' to 'example'",
 //		Input:       "This is a test",
 //	})
 //
 // https://beta.openai.com/docs/api-reference/edits/create
-func (c *Client) CreateEdit(ctx context.Context, h *http.Client, req *CreateEditRequest) (*CreateEditResponse, error) {
-	if h == nil {
-		h = http.DefaultClient
-	}
-
+func (c *Client) CreateEdit(ctx context.Context, req *CreateEditRequest) (*CreateEditResponse, error) {
 	b, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
@@ -331,7 +364,11 @@ func (c *Client) CreateEdit(ctx context.Context, h *http.Client, req *CreateEdit
 	r.Header.Set("Content-Type", "application/json")
 	r.Header.Set("Content-Length", fmt.Sprintf("%d", len(b)))
 
-	resp, err := h.Do(r)
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
 	if err != nil {
 		return nil, err
 	}
@@ -390,7 +427,7 @@ type CreateImageResponse struct {
 //
 // # Example
 //
-//	resp, _ := c.CreateImage(ctx, nil, &openai.CreateImageRequest{
+//	resp, _ := c.CreateImage(ctx, &openai.CreateImageRequest{
 //		Prompt:         "Golang-style gopher mascot wearing an OpenAI t-shirt",
 //		N:              1,
 //		Size:           "256x256",
@@ -398,11 +435,7 @@ type CreateImageResponse struct {
 //	})
 //
 // https://beta.openai.com/docs/api-reference/images/create
-func (c *Client) CreateImage(ctx context.Context, h *http.Client, req *CreateImageRequest) (*CreateImageResponse, error) {
-	if h == nil {
-		h = http.DefaultClient
-	}
-
+func (c *Client) CreateImage(ctx context.Context, req *CreateImageRequest) (*CreateImageResponse, error) {
 	b, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
@@ -417,7 +450,11 @@ func (c *Client) CreateImage(ctx context.Context, h *http.Client, req *CreateIma
 	r.Header.Set("Content-Type", "application/json")
 	r.Header.Set("Content-Length", fmt.Sprintf("%d", len(b)))
 
-	resp, err := h.Do(r)
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
 	if err != nil {
 		return nil, err
 	}
