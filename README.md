@@ -121,3 +121,60 @@ $ openai markdown table of prices
 | Pear                        | $1.25  |
 | Pineapple                   | $2.00  |
 ```
+
+```console
+$ openai how do I convert from f to c 
+To convert from Fahrenheit (F) to Celsius (C), use the following formula:
+C = (F - 32) / 1.8
+
+For example, if the temperature is 100°F, then the temperature in Celsius is 37.78°C.
+C = (100 - 32) / 1.8
+C = 68 / 1.8
+C = 37.78°C
+```
+
+```console
+$ openai % ~/.vscode/op-go-run.sh run cmd/openai/main.go ascii art cat           
+  \    /\
+  )  ( ')
+ (  /  )
+  \(__)|
+```
+
+```console
+$ openai ascii art cat with ball of yarn
+  /\_/\
+ ( o.o )
+ > ^ <
+ (  _  )
+ /   \/
+  \_^_/
+   \_/
+```
+
+```console
+$ openai ascii art picat
+ 
+            _.-^^---....,,--
+        _--                  --_
+       <                        >)
+       |                         |
+        \._                   _./
+           ```--. . , ; .--'''
+               | |   |
+            .-=||  | |=-.
+            `-=#$%&%$#=-'
+               | ;  :|
+            _.-' \_/ \`-._
+        - -^\$\$\$\$\$\$\$\$\$/^^- -
+           _-^ \$$\$/\$$\$\$-_
+          <   \$\$ | >-\$-   >
+           \$\$\$  |  \$\$\$\$
+            `\$\$\$\$--\$\$\$\$'
+                |  |
+                |  |
+                |  |
+                |  |
+                |  |
+        _____/ \__/ \_____
+```
