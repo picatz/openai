@@ -86,3 +86,20 @@ func TestCreateImage(t *testing.T) {
 
 	t.Logf("image url: %v", *resp.Data[0].URL)
 }
+
+func TestCreateEmbedding(t *testing.T) {
+	c := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
+
+	ctx := testCtx(t)
+
+	resp, err := c.CreateEmbedding(ctx, &openai.CreateEmbeddingRequest{
+		Model: openai.ModelTextEmbeddingAda002,
+		Input: "The food was delicious and the waiter...",
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("embedding: %#+v", resp)
+}

@@ -153,5 +153,9 @@ const (
 	ModelTextDavinciEdit001 Model = "text-davinci-edit-001"
 	ModelCodeDavinciEdit001 Model = "code-davinci-edit-001"
 
+	// https://platform.openai.com/docs/guides/embeddings/embedding-models
+	ModelTextEmbeddingAda001 Model = "text-embedding-ada-001"
+	ModelTextEmbeddingAda002 Model = "text-embedding-ada-002"
+
 	// TODO: add more "known" models.
 )

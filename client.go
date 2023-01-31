@@ -474,6 +474,87 @@ func (c *Client) CreateImage(ctx context.Context, req *CreateImageRequest) (*Cre
 
 }
 
+// https://platform.openai.com/docs/api-reference/embeddings
+type CreateEmbeddingRequest struct {
+	// https://platform.openai.com/docs/api-reference/embeddings/create#embeddings/create-model
+	//
+	// Required. The text to embed.
+	Model string `json:"model"`
+
+	// https://platform.openai.com/docs/api-reference/embeddings/create#embeddings/create-input
+	//
+	// Required. The text to embed.
+	Input string `json:"input"`
+
+	// https://platform.openai.com/docs/api-reference/embeddings/create#embeddings/create-user
+	User string `json:"user,omitempty"`
+}
+
+// CreateEmbeddingResponse ...
+//
+// https://platform.openai.com/docs/guides/embeddings/what-are-embeddings
+type CreateEmbeddingResponse struct {
+	Object string `json:"object"`
+	Data   []struct {
+		Object    string    `json:"object"`
+		Embedding []float64 `json:"embedding"`
+		Index     int       `json:"index"`
+	} `json:"data"`
+	Model string `json:"model"`
+	Usage struct {
+		PromptTokens int `json:"prompt_tokens"`
+		TotalTokens  int `json:"total_tokens"`
+	} `json:"usage"`
+}
+
+// CreateEmbedding performs a "embedding" request using the OpenAI API.
+//
+// # Example
+//
+//	resp, _ := c.CreateEmbedding(ctx, &openai.CreateEmbeddingRequest{
+//		Model: openai.ModelTextEmbeddingAda002,
+//		Input: "The food was delicious and the waiter...",
+//	})
+//
+// https://platform.openai.com/docs/api-reference/embeddings
+func (c *Client) CreateEmbedding(ctx context.Context, req *CreateEmbeddingRequest) (*CreateEmbeddingResponse, error) {
+	b, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/embeddings", bytes.NewReader(b))
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Set("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("Content-Length", fmt.Sprintf("%d", len(b)))
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+
+	cResp := &CreateEmbeddingResponse{}
+	err = json.NewDecoder(resp.Body).Decode(cResp)
+	if err != nil {
+		return nil, err
+	}
+
+	return cResp, nil
+}
+
 // TODO:
 // - https://beta.openai.com/docs/api-reference/images/create-edit
 // - https://beta.openai.com/docs/api-reference/images/create-variation
