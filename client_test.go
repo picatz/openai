@@ -10,11 +10,16 @@ import (
 	"github.com/picatz/openai"
 )
 
+func testCtx(t *testing.T) context.Context {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	t.Cleanup(cancel)
+	return ctx
+}
+
 func TestCreateCompletion(t *testing.T) {
 	c := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	ctx := testCtx(t)
 
 	resp, err := c.CreateCompletion(ctx, &openai.CreateCompletionRequest{
 		Model:     openai.ModelDavinci,
@@ -36,8 +41,7 @@ func TestCreateCompletion(t *testing.T) {
 func TestCreateEdit(t *testing.T) {
 	c := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	ctx := testCtx(t)
 
 	resp, err := c.CreateEdit(ctx, &openai.CreateEditRequest{
 		Model:       openai.ModelTextDavinciEdit001,
@@ -63,8 +67,7 @@ func TestCreateEdit(t *testing.T) {
 func TestCreateImage(t *testing.T) {
 	c := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	ctx := testCtx(t)
 
 	resp, err := c.CreateImage(ctx, &openai.CreateImageRequest{
 		Prompt:         "Golang-style gopher mascot wearing an OpenAI t-shirt",
