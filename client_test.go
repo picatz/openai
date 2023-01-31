@@ -103,3 +103,19 @@ func TestCreateEmbedding(t *testing.T) {
 
 	t.Logf("embedding: %#+v", resp)
 }
+
+func TestCreateModeration(t *testing.T) {
+	c := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
+
+	ctx := testCtx(t)
+
+	resp, err := c.CreateModeration(ctx, &openai.CreateModerationRequest{
+		Input: "I want to kill them.",
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("moderation: %#+v", resp)
+}

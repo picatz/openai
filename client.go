@@ -555,10 +555,97 @@ func (c *Client) CreateEmbedding(ctx context.Context, req *CreateEmbeddingReques
 	return cResp, nil
 }
 
+// https://platform.openai.com/docs/api-reference/moderations/create
+type CreateModerationRequest struct {
+	// https://platform.openai.com/docs/api-reference/moderations/create#moderations/create-model
+	//
+	// Optional. The model to use for moderation. Defaults to "text-moderation-latest".
+	Model string `json:"model"`
+
+	// https://platform.openai.com/docs/api-reference/moderations/create#moderations/create-input
+	//
+	// Required. The text to moderate.
+	Input string `json:"input"`
+}
+
+// CreateModerationResponse ...
+//
+// https://platform.openai.com/docs/guides/moderations/what-are-moderations
+type CreateModerationResponse struct {
+	ID      string `json:"id"`
+	Model   string `json:"model"`
+	Results []struct {
+		Categories struct {
+			Hate            bool `json:"hate"`
+			HateThreatening bool `json:"hate/threatening"`
+			SelfHarm        bool `json:"self-harm"`
+			Sexual          bool `json:"sexual"`
+			SexualMinors    bool `json:"sexual/minors"`
+			Violence        bool `json:"violence"`
+			ViolenceGraphic bool `json:"violence/graphic"`
+		} `json:"categories"`
+		CategoryScores struct {
+			Hate            float64 `json:"hate"`
+			HateThreatening float64 `json:"hate/threatening"`
+			SelfHarm        float64 `json:"self-harm"`
+			Sexual          float64 `json:"sexual"`
+			SexualMinors    float64 `json:"sexual/minors"`
+			Violence        float64 `json:"violence"`
+			ViolenceGraphic float64 `json:"violence/graphic"`
+		} `json:"category_scores"`
+		Flagged bool `json:"flagged"`
+	} `json:"results"`
+}
+
+// CreateModeration performs a "moderation" request using the OpenAI API.
+//
+// # Example
+//
+//	resp, _ := c.CreateModeration(ctx, &openai.CreateModerationRequest{
+//		Input: "I want to kill them.",
+//	})
+//
+// https://platform.openai.com/docs/api-reference/moderations
+func (c *Client) CreateModeration(ctx context.Context, req *CreateModerationRequest) (*CreateModerationResponse, error) {
+	b, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/moderations", bytes.NewReader(b))
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Set("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("Content-Length", fmt.Sprintf("%d", len(b)))
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+
+	cResp := &CreateModerationResponse{}
+	err = json.NewDecoder(resp.Body).Decode(cResp)
+	if err != nil {
+		return nil, err
+	}
+
+	return cResp, nil
+}
+
 // TODO:
 // - https://beta.openai.com/docs/api-reference/images/create-edit
 // - https://beta.openai.com/docs/api-reference/images/create-variation
-// - https://beta.openai.com/docs/api-reference/embeddings
 // - https://beta.openai.com/docs/api-reference/files
 // - https://beta.openai.com/docs/api-reference/fine-tunes
-// - https://beta.openai.com/docs/api-reference/moderations
