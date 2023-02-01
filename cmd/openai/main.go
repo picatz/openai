@@ -101,7 +101,7 @@ func main() {
 
 		// Create edit request.
 		resp, err := client.CreateEdit(ctx, &openai.CreateEditRequest{
-			Model:       openai.ModelTextDavinciEdit001,
+			Model:       openai.ModelTextDavinciEdit001, // This is the only model that supports edit at the moment.
 			Instruction: strings.Join(args, " "),
 			Input:       string(b[:n]),
 			Temperature: 1,
