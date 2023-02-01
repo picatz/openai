@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 )
 
@@ -644,8 +645,814 @@ func (c *Client) CreateModeration(ctx context.Context, req *CreateModerationRequ
 	return cResp, nil
 }
 
+// https://platform.openai.com/docs/api-reference/files/list
+type ListFilesRequest struct {
+	// There are currently no parameters for this endpoint?
+}
+
+// ListFilesResponse ...
+//
+// https://platform.openai.com/docs/api-reference/files/list
+type ListFilesResponse struct {
+	Data []struct {
+		ID        string `json:"id"`
+		Object    string `json:"object"`
+		Bytes     int    `json:"bytes"`
+		CreatedAt int    `json:"created_at"`
+		Filename  string `json:"filename"`
+		Purpose   string `json:"purpose"`
+	} `json:"data"`
+	Object string `json:"object"`
+}
+
+// ListFiles performs a "list files" request using the OpenAI API.
+//
+// # Example
+//
+//	resp, _ := c.ListFiles(ctx, &openai.ListFilesRequest{})
+//
+// https://platform.openai.com/docs/api-reference/files
+func (c *Client) ListFiles(ctx context.Context, req *ListFilesRequest) (*ListFilesResponse, error) {
+	r, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.openai.com/v1/files", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Set("Authorization", "Bearer "+c.APIKey)
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+
+	cResp := &ListFilesResponse{}
+	err = json.NewDecoder(resp.Body).Decode(cResp)
+	if err != nil {
+		return nil, err
+	}
+
+	return cResp, nil
+}
+
+// https://platform.openai.com/docs/api-reference/files/upload
+type UploadFileRequest struct {
+	// Name of the JSON Lines file to be uploaded.
+	//
+	// If the purpose is set to "fine-tune", each line is a JSON
+	// record with "prompt" and "completion" fields representing
+	// your training examples.
+	//
+	// Required.
+	Name string `json:"name"`
+
+	// Purpose of the uploaded documents.
+	//
+	// Use "fine-tune" for Fine-tuning. This allows us to validate t
+	// the format of the uploaded file.
+	//
+	// Required.
+	Purpose string `json:"purpose"`
+
+	// Body of the file to upload.
+	//
+	// Required.
+	Body io.Reader `json:"file"` // TODO: how to handle this?
+}
+
+// UploadFileResponse ...
+//
+// https://platform.openai.com/docs/api-reference/files/upload
+type UploadFileResponse struct {
+	ID        string `json:"id"`
+	Object    string `json:"object"`
+	Bytes     int    `json:"bytes"`
+	CreatedAt int    `json:"created_at"`
+	Filename  string `json:"filename"`
+	Purpose   string `json:"purpose"`
+}
+
+// UploadFile performs a "upload file" request using the OpenAI API.
+//
+// # Example
+//
+//	resp, _ := c.UploadFile(ctx, &openai.UploadFileRequest{
+//		Name:    "fine-tune.jsonl",
+//		Purpose: "fine-tune",
+//	})
+//
+// # CURL
+//
+//	$ curl "https://api.openai.com/v1/files" \
+//	 -H "Authorization: Bearer ..." \
+//	 -F purpose="fine-tune" \
+//	 -F file='@mydata.jsonl'
+//
+// https://platform.openai.com/docs/api-reference/files
+func (c *Client) UploadFile(ctx context.Context, req *UploadFileRequest) (*UploadFileResponse, error) {
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/files", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Set("Authorization", "Bearer "+c.APIKey)
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	r.Header.Set("Content-Type", "multipart/form-data")
+
+	var b bytes.Buffer
+	w := multipart.NewWriter(&b)
+
+	fw, err := w.CreateFormFile("file", req.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = io.Copy(fw, req.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	err = w.WriteField("purpose", req.Purpose)
+	if err != nil {
+		return nil, err
+	}
+
+	err = w.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	r.Body = io.NopCloser(&b)
+	r.ContentLength = int64(b.Len())
+	r.Header.Set("Content-Type", w.FormDataContentType())
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+
+	cResp := &UploadFileResponse{}
+	err = json.NewDecoder(resp.Body).Decode(cResp)
+	if err != nil {
+		return nil, err
+	}
+
+	return cResp, nil
+}
+
+// https://platform.openai.com/docs/api-reference/files/delete
+type DeleteFileRequest struct {
+	// ID of the file to delete.
+	//
+	// Required.
+	ID string `json:"id"`
+}
+
+// DeleteFileResponse ...
+//
+// https://platform.openai.com/docs/api-reference/files/delete
+type DeleteFileResponse struct {
+	ID      string `json:"id"`
+	Object  string `json:"object"`
+	Deleted bool   `json:"deleted"`
+}
+
+// DeleteFile performs a "delete file" request using the OpenAI API.
+//
+// # Example
+//
+//	resp, _ := c.DeleteFile(ctx, &openai.DeleteFileRequest{
+//		ID: "file-123",
+//	})
+//
+// # CURL
+//
+//	$ curl "https://api.openai.com/v1/files/file-XjGxS3KTG0uNmNOK362iJua3" \
+//		-X DELETE \
+//		-H "Authorization: Bearer ..."
+//
+// https://platform.openai.com/docs/api-reference/files/delete
+func (c *Client) DeleteFile(ctx context.Context, req *DeleteFileRequest) (*DeleteFileResponse, error) {
+	r, err := http.NewRequestWithContext(ctx, http.MethodDelete, "https://api.openai.com/v1/files/"+req.ID, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Set("Authorization", "Bearer "+c.APIKey)
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+
+	cResp := &DeleteFileResponse{}
+	err = json.NewDecoder(resp.Body).Decode(cResp)
+	if err != nil {
+		return nil, err
+	}
+
+	return cResp, nil
+}
+
+// https://platform.openai.com/docs/api-reference/files/retrieve
+type GetFileInfoRequest struct {
+	// ID of the file to retrieve.
+	//
+	// Required.
+	ID string `json:"id"`
+}
+
+// GetFileInfoResponse ...
+//
+// https://platform.openai.com/docs/api-reference/files/retrieve
+type GetFileInfoResponse struct {
+	ID        string `json:"id"`
+	Object    string `json:"object"`
+	Bytes     int    `json:"bytes"`
+	CreatedAt int    `json:"created_at"`
+	Filename  string `json:"filename"`
+	Purpose   string `json:"purpose"`
+}
+
+// GetFileInfo performs a "get file info (retrieve)" request using the OpenAI API.
+//
+// # Example
+//
+//	resp, _ := c.GetFileInfo(ctx, &openai.GetFileRequest{
+//		ID: "file-123",
+//	})
+//
+// # CURL
+//
+//	$ curl "https://api.openai.com/v1/files/file-XjGxS3KTG0uNmNOK362iJua3" \
+//		-H "Authorization: Bearer ..."
+//
+// https://platform.openai.com/docs/api-reference/files/retrieve
+func (c *Client) GetFileInfo(ctx context.Context, req *GetFileInfoRequest) (*GetFileInfoResponse, error) {
+	r, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.openai.com/v1/files/"+req.ID, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+
+	cResp := &GetFileInfoResponse{}
+	err = json.NewDecoder(resp.Body).Decode(cResp)
+	if err != nil {
+		return nil, err
+	}
+
+	return cResp, nil
+}
+
+// https://platform.openai.com/docs/api-reference/files/retrieve-content
+type GetFileContentRequest struct {
+	// ID of the file to retrieve.
+	//
+	// Required.
+	ID string `json:"id"`
+}
+
+// GetFileContentResponse ...
+//
+// https://platform.openai.com/docs/api-reference/files/retrieve-content
+type GetFileContentResponse struct {
+	// Body is the file content returned by the OpenAI API.
+	//
+	// The caller is responsible for closing the body, and should do so as soon as possible.
+	Body io.ReadCloser
+}
+
+// GetFileContent performs a "get file content (retrieve content)" request using the OpenAI API.
+//
+// # Example
+//
+//	resp, _ := c.GetFileContent(ctx, &openai.GetFileContentRequest{
+//		ID: "file-123",
+//	})
+//
+// # CURL
+//
+//	$ curl "https://api.openai.com/v1/files/file-XjGxS3KTG0uNmNOK362iJua3/contents" \
+//		-H "Authorization: Bearer ..."
+//
+// https://platform.openai.com/docs/api-reference/files/retrieve-content
+func (c *Client) GetFileContent(ctx context.Context, req *GetFileContentRequest) (*GetFileContentResponse, error) {
+	r, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.openai.com/v1/files/"+req.ID+"/contents", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+
+	return &GetFileContentResponse{
+		Body: resp.Body,
+	}, nil
+}
+
+// https://platform.openai.com/docs/api-reference/fine-tunes/create
+type CreateFineTuneRequest struct {
+	// https://platform.openai.com/docs/api-reference/fine-tunes/create#fine-tunes/create-training_file
+	//
+	// Required.
+	TrainingFile string `json:"training_file"`
+
+	// https://platform.openai.com/docs/api-reference/fine-tunes/create#fine-tunes/create-validation_file
+	//
+	// Optional.
+	ValidationFile string `json:"validation_file,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/fine-tunes/create#fine-tunes/create-model
+	//
+	// Optional. Defaults to "curie".
+	Model string `json:"model,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/fine-tunes/create#fine-tunes/create-epochs
+	//
+	// Optional. Defaults to 4.
+	Epochs int `json:"n_epochs,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/fine-tunes/create#fine-tunes/create-batch_size
+	//
+	// Optional. Defaults to 32.
+	BatchSize int `json:"batch_size,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/fine-tunes/create#fine-tunes/create-learning_rate_multiplier
+	//
+	// Optional. Default depends on the batch size.
+	LearningRateMultiplier float64 `json:"learning_rate_multiplier,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/fine-tunes/create#fine-tunes/create-prompt_loss_weight
+	//
+	// Optional. Defaults to 0.01
+	PromptLossWeight float64 `json:"prompt_loss_weight,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/fine-tunes/create#fine-tunes/create-compute_classification_metrics
+	//
+	// Optional. Defaults to false.
+	ComputeClassificationMetrics bool `json:"compute_classification_metrics,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/fine-tunes/create#fine-tunes/create-classification_n_classes
+	//
+	// Optional, but required for multi-class classification.
+	ClassificationNClasses int `json:"classification_n_classes,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/fine-tunes/create#fine-tunes/create-classification_positive_class
+	//
+	// Optional, but required for binary classification.
+	ClassificationPositiveClass string `json:"classification_positive_class,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/fine-tunes/create#fine-tunes/create-classification_betas
+	//
+	// Optional, only used for binary classification.
+	ClassificationBetas []float64 `json:"classification_betas,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/fine-tunes/create#fine-tunes/create-suffix
+	//
+	// A string of up to 40 characters that will be added to your fine-tuned model name.
+	//
+	// For example, a suffix of "custom-model-name" would produce a model name like
+	// `ada:ft-your-org:custom-model-name-2022-02-15-04-21-04`.
+	//
+	// Optional.
+	Suffix string `json:"suffix,omitempty"`
+}
+
+// CreateFineTuneResponse is the response from a "create fine-tune" request.
+//
+// https://platform.openai.com/docs/api-reference/fine-tunes/create
+type CreateFineTuneResponse struct {
+	ID        string `json:"id"`
+	Object    string `json:"object"`
+	Model     string `json:"model"`
+	CreatedAt int    `json:"created_at"`
+	Events    []struct {
+		Object    string `json:"object"`
+		CreatedAt int    `json:"created_at"`
+		Level     string `json:"level"`
+		Message   string `json:"message"`
+	} `json:"events"`
+	FineTunedModel interface{} `json:"fine_tuned_model"`
+	Hyperparams    struct {
+		BatchSize              int     `json:"batch_size"`
+		LearningRateMultiplier float64 `json:"learning_rate_multiplier"`
+		NEpochs                int     `json:"n_epochs"`
+		PromptLossWeight       float64 `json:"prompt_loss_weight"`
+	} `json:"hyperparams"`
+	OrganizationID  string        `json:"organization_id"`
+	ResultFiles     []interface{} `json:"result_files"`
+	Status          string        `json:"status"`
+	ValidationFiles []interface{} `json:"validation_files"`
+	TrainingFiles   []struct {
+		ID        string `json:"id"`
+		Object    string `json:"object"`
+		Bytes     int    `json:"bytes"`
+		CreatedAt int    `json:"created_at"`
+		Filename  string `json:"filename"`
+		Purpose   string `json:"purpose"`
+	} `json:"training_files"`
+	UpdatedAt int `json:"updated_at"`
+}
+
+// https://platform.openai.com/docs/api-reference/fine-tunes/create
+func (c *Client) CreateFineTune(ctx context.Context, req *CreateFineTuneRequest) (*CreateFineTuneResponse, error) {
+	b, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.openai.com/v1/fine-tunes", bytes.NewReader(b))
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+
+	var res CreateFineTuneResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &res, nil
+}
+
+// https://platform.openai.com/docs/api-reference/fine-tunes/list
+type ListFineTunesRequest struct {
+	// No fields yet.
+}
+
+// https://platform.openai.com/docs/api-reference/fine-tunes/list
+type ListFineTunesResponse struct {
+	Object string `json:"object"`
+	Data   []struct {
+		ID              string         `json:"id"`
+		Object          string         `json:"object"`
+		Model           string         `json:"model"`
+		CreatedAt       int            `json:"created_at"`
+		FineTunedModel  any            `json:"fine_tuned_model"`
+		Hyperparams     map[string]any `json:"hyperparams"`
+		OrganizationID  string         `json:"organization_id"`
+		ResultFiles     []any          `json:"result_files"`
+		Status          string         `json:"status"`
+		ValidationFiles []any          `json:"validation_files"`
+		TrainingFiles   []any          `json:"training_files"`
+		UpdatedAt       int            `json:"updated_at"`
+	} `json:"data"`
+}
+
+// https://platform.openai.com/docs/api-reference/fine-tunes/list
+func (c *Client) ListFineTunes(ctx context.Context, req *ListFineTunesRequest) (*ListFineTunesResponse, error) {
+	r, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.openai.com/v1/fine-tunes", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+
+	var res ListFineTunesResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &res, nil
+}
+
+// https://platform.openai.com/docs/api-reference/fine-tunes/retrieve
+type GetFineTuneRequest struct {
+	ID string `json:"id"`
+}
+
+// https://platform.openai.com/docs/api-reference/fine-tunes/retrieve
+type GetFineTuneResponse struct {
+	ID        string `json:"id"`
+	Object    string `json:"object"`
+	Model     string `json:"model"`
+	CreatedAt int    `json:"created_at"`
+	Events    []struct {
+		Object    string `json:"object"`
+		CreatedAt int    `json:"created_at"`
+		Level     string `json:"level"`
+		Message   string `json:"message"`
+	} `json:"events"`
+	FineTunedModel string `json:"fine_tuned_model"`
+	Hyperparams    struct {
+		BatchSize              int     `json:"batch_size"`
+		LearningRateMultiplier float64 `json:"learning_rate_multiplier"`
+		NEpochs                int     `json:"n_epochs"`
+		PromptLossWeight       float64 `json:"prompt_loss_weight"`
+	} `json:"hyperparams"`
+	OrganizationID string `json:"organization_id"`
+	ResultFiles    []struct {
+		ID        string `json:"id"`
+		Object    string `json:"object"`
+		Bytes     int    `json:"bytes"`
+		CreatedAt int    `json:"created_at"`
+		Filename  string `json:"filename"`
+		Purpose   string `json:"purpose"`
+	} `json:"result_files"`
+	Status          string `json:"status"`
+	ValidationFiles []any  `json:"validation_files"`
+	TrainingFiles   []struct {
+		ID        string `json:"id"`
+		Object    string `json:"object"`
+		Bytes     int    `json:"bytes"`
+		CreatedAt int    `json:"created_at"`
+		Filename  string `json:"filename"`
+		Purpose   string `json:"purpose"`
+	} `json:"training_files"`
+	UpdatedAt int `json:"updated_at"`
+}
+
+// https://platform.openai.com/docs/api-reference/fine-tunes/retrieve
+func (c *Client) GetFineTune(ctx context.Context, req *GetFineTuneRequest) (*GetFineTuneResponse, error) {
+	r, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.openai.com/v1/fine-tunes/"+req.ID, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+
+	var res GetFineTuneResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &res, nil
+}
+
+// https://platform.openai.com/docs/api-reference/fine-tunes/cancel
+type CancelFineTuneRequest struct {
+	ID string `json:"id"`
+}
+
+// https://platform.openai.com/docs/api-reference/fine-tunes/cancel
+type CancelFineTuneResponse struct {
+	ID        string `json:"id"`
+	Object    string `json:"object"`
+	Model     string `json:"model"`
+	CreatedAt int    `json:"created_at"`
+	Events    []struct {
+	} `json:"events"`
+	FineTunedModel  any    `json:"fine_tuned_model"`
+	Hyperparams     any    `json:"hyperparams"`
+	OrganizationID  string `json:"organization_id"`
+	ResultFiles     []any  `json:"result_files"`
+	Status          string `json:"status"`
+	ValidationFiles []any  `json:"validation_files"`
+	TrainingFiles   []struct {
+		ID        string `json:"id"`
+		Object    string `json:"object"`
+		Bytes     int    `json:"bytes"`
+		CreatedAt int    `json:"created_at"`
+		Filename  string `json:"filename"`
+		Purpose   string `json:"purpose"`
+	} `json:"training_files"`
+	UpdatedAt int `json:"updated_at"`
+}
+
+// https://platform.openai.com/docs/api-reference/fine-tunes/cancel
+func (c *Client) CancelFineTune(ctx context.Context, req *CancelFineTuneRequest) (*CancelFineTuneResponse, error) {
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/fine-tunes/"+req.ID+"/cancel", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+
+	var res CancelFineTuneResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &res, nil
+}
+
+// https://platform.openai.com/docs/api-reference/fine-tunes/events
+type ListFineTuneEventsRequest struct {
+	// https://platform.openai.com/docs/api-reference/fine-tunes/events#fine-tunes/events-fine_tune_id
+	//
+	// Required.
+	ID string `json:"id"`
+
+	// https://platform.openai.com/docs/api-reference/fine-tunes/events#fine-tunes/events-stream
+	//
+	// Optional.
+	Stream bool `json:"stream"`
+}
+
+// https://platform.openai.com/docs/api-reference/fine-tunes/events
+type ListFineTuneEventsResponse struct {
+	Object string `json:"object"`
+	Data   []struct {
+		Object    string `json:"object"`
+		CreatedAt int    `json:"created_at"`
+		Level     string `json:"level"`
+		Message   string `json:"message"`
+	} `json:"data"`
+
+	// https://platform.openai.com/docs/api-reference/fine-tunes/events#fine-tunes/events-stream
+	//
+	// Only present if stream=true. Up to the caller to close the stream, e.g.: defer res.Stream.Close()
+	Stream io.ReadCloser `json:"-"`
+}
+
+// https://platform.openai.com/docs/api-reference/fine-tunes/events
+func (c *Client) ListFineTuneEvents(ctx context.Context, req *ListFineTuneEventsRequest) (*ListFineTuneEventsResponse, error) {
+	r, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.openai.com/v1/fine-tunes/"+req.ID+"/events", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if req.Stream {
+		q := r.URL.Query()
+		q.Set("stream", "true")
+		r.URL.RawQuery = q.Encode()
+	}
+
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+
+	var res ListFineTuneEventsResponse
+	if !req.Stream {
+		if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+			return nil, fmt.Errorf("failed to decode response: %w", err)
+		}
+	} else {
+		res.Stream = resp.Body
+	}
+
+	return &res, nil
+}
+
+// https://platform.openai.com/docs/api-reference/fine-tunes/delete-model
+type DeleteFineTuneModelRequest struct {
+	// https://platform.openai.com/docs/api-reference/fine-tunes/delete-model#fine-tunes/delete-model-model
+	//
+	// Required.
+	ID string `json:"model"`
+}
+
+// https://platform.openai.com/docs/api-reference/fine-tunes/delete-model
+type DeleteFineTuneModelResponse struct {
+	ID      string `json:"id"`
+	Object  string `json:"object"`
+	Deleted bool   `json:"deleted"`
+}
+
+// https://platform.openai.com/docs/api-reference/fine-tunes/delete-model
+func (c *Client) DeleteFineTuneModel(ctx context.Context, req *DeleteFineTuneModelRequest) (*DeleteFineTuneModelResponse, error) {
+	r, err := http.NewRequestWithContext(ctx, http.MethodDelete, "https://api.openai.com/v1/fine-tunes/"+req.ID, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+
+	var res DeleteFineTuneModelResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &res, nil
+}
+
 // TODO:
 // - https://beta.openai.com/docs/api-reference/images/create-edit
 // - https://beta.openai.com/docs/api-reference/images/create-variation
-// - https://beta.openai.com/docs/api-reference/files
-// - https://beta.openai.com/docs/api-reference/fine-tunes
