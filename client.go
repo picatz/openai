@@ -159,10 +159,10 @@ type CreateCompletionRequest struct {
 	User string `json:"user,omitempty"`
 }
 
-// CompletionResponse is the response from a "completion" request to the OpenAI API.
+// CreateCompletionResponse is the response from a "completion" request to the OpenAI API.
 //
 // https://beta.openai.com/docs/api-reference/completions/create
-type CompletionResponse struct {
+type CreateCompletionResponse struct {
 	ID      string `json:"id"`
 	Object  string `json:"object"`
 	Created int    `json:"created"`
