@@ -64,6 +64,24 @@ $ go install github.com/picatz/openai/cmd/openai@latest
 > **Note**: do not rely on this for reliable output.
 
 ```console
+$ openai chat
+
+Welcome to the OpenAI API CLI chat mode. Type 'exit' to quit.
+
+> Hello!
+
+Hello there! How may I assist you today?
+
+> How to generate SSH key?
+
+To generate an SSH key, follow these steps:
+
+1. Open the Terminal on your computer.
+2. Type in the following command and press 
+...
+```
+
+```console
 $ echo "1,2,3,4,5" | openai convert to JSON                  
 [1,2,3,4,5]
 ```
