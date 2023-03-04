@@ -49,7 +49,13 @@ fmt.Println(*resp.Data[0].URL)
 
 ### `openai` CLI
 
-Use OpenAI's edit and completion features on the command-line.
+Use OpenAI's chat or edit and completion features on the command-line.
+
+#### Modes
+
+* **Chat**: chat mode is enabled using the `chat` command line argument. This is like ChatGPT for your command-line.
+* **Edit**: edit mode is enabled when you pipe (`|`) information into the program's STDIN.
+* **Complete**: completion mode is enabled when one or more command line arguments are provided.
 
 ```console
 $ go install github.com/picatz/openai/cmd/openai@latest
