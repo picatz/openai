@@ -2,6 +2,7 @@ package openai_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -144,4 +145,74 @@ func TestCreateChat(t *testing.T) {
 	t.Logf("user: %q", userMessage)
 
 	t.Logf("bot: %q", strings.TrimSpace(resp.Choices[0].Message.Content))
+}
+
+func ExampleClient_CreateCompletion() {
+	c := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
+
+	ctx := context.Background()
+
+	resp, err := c.CreateCompletion(ctx, &openai.CreateCompletionRequest{
+		Model:     openai.ModelDavinci,
+		Prompt:    []string{"The cow jumped over the"},
+		MaxTokens: 1,
+		N:         1,
+	})
+
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(resp.Choices[0].Text)
+	// Output: moon
+}
+
+func ExampleClient_CreateEdit() {
+	c := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
+
+	ctx := context.Background()
+
+	resp, err := c.CreateEdit(ctx, &openai.CreateEditRequest{
+		Model:       openai.ModelTextDavinciEdit001,
+		Instruction: "ONLY change the word 'test' to 'example', with no other changes",
+		Input:       "This is a test",
+	})
+
+	if err != nil {
+		panic(err)
+	}
+
+	// Get the words from the response.
+	words := strings.Split(resp.Choices[0].Text, " ")
+
+	fmt.Println(words[len(words)-1])
+	// Output: example
+}
+
+func ExampleClient_CreateChat() {
+	c := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
+
+	ctx := context.Background()
+
+	messages := []openai.ChatMessage{
+		{
+			Role:    openai.ChatRoleSystem,
+			Content: "You are a helpful assistant familiar with children's stories, and answer in only single words.",
+		},
+		{
+			Role:    "user",
+			Content: "Clifford is a big dog, but what color is he?",
+		},
+	}
+
+	resp, err := c.CreateChat(ctx, &openai.CreateChatRequest{
+		Model:    openai.ModelGPT35Turbo,
+		Messages: messages,
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(strings.ToLower(strings.TrimRight(strings.TrimSpace(resp.Choices[0].Message.Content), ".")))
+	// Output: red
 }
