@@ -3,7 +3,7 @@ package openai
 // ChatRole is a role that can be used in a chat session, either “system”, “user”, or “assistant”.
 //
 // https://platform.openai.com/docs/guides/chat/introduction
-type ChatRole string
+type ChatRole = string
 
 const (
 	// ChatRoleUser is a user role.
