@@ -119,3 +119,29 @@ func TestCreateModeration(t *testing.T) {
 
 	t.Logf("moderation: %#+v", resp)
 }
+
+func TestCreateChat(t *testing.T) {
+	c := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
+
+	ctx := testCtx(t)
+
+	userMessage := "Hello!"
+
+	resp, err := c.CreateChat(ctx, &openai.CreateChatRequest{
+		Model: openai.ModelGPT35Turbo,
+		Messages: []openai.ChatMessage{
+			{
+				Role:    "user",
+				Content: userMessage,
+			},
+		},
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("user: %q", userMessage)
+
+	t.Logf("bot: %q", strings.TrimSpace(resp.Choices[0].Message.Content))
+}
