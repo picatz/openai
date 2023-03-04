@@ -157,5 +157,9 @@ const (
 	ModelTextEmbeddingAda001 Model = "text-embedding-ada-001"
 	ModelTextEmbeddingAda002 Model = "text-embedding-ada-002"
 
+	// https://platform.openai.com/docs/api-reference/chat/create#chat/create-model
+	ModelGPT35Turbo     Model = "gpt-3.5-turbo"
+	ModelGPT35Turbo0301 Model = "gpt-3.5-turbo-0301"
+
 	// TODO: add more "known" models.
 )
