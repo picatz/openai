@@ -47,6 +47,20 @@ resp, _ := client.CreateImage(ctx, &openai.CreateImageRequest{
 fmt.Println(*resp.Data[0].URL)
 ```
 
+```go
+resp, _ := client.CreateChat(ctx, &openai.CreateChatRequest{
+	Model: openai.ModelGPT35Turbo,
+	Messages: []openai.ChatMessage{
+		{
+			Role:    openai.ChatRoleUser,
+			Content: "Hello!", // Put user content here...
+		},
+	},
+})
+
+fmt.Println(resp.Choices[0].Message.Content)
+```
+
 ### `openai` CLI
 
 Use OpenAI's chat or edit and completion features on the command-line.
