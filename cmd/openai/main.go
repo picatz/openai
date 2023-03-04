@@ -36,6 +36,14 @@ import (
 // 	she overcame with determination and courage. After a long and difficult journey, the princess
 // 	eventually succeeded in her mission and saved her kingdom. She returned home to great celebration
 // 	and was forever remembered as a hero.
+//
+// # Chat Mode
+//
+//  This mode will start an interactive chat session with the OpenAI API on the command line. It can
+//  be used similar to ChatGPT's web interface, but on the command line.
+//
+// 	$ openai chat
+//  ...
 
 // Mode of operation.
 type Mode string
@@ -44,6 +52,7 @@ type Mode string
 const (
 	ModeEdit     Mode = "edit"
 	ModeComplete Mode = "complete"
+	ModeChat     Mode = "chat"
 )
 
 func main() {
@@ -76,20 +85,25 @@ func main() {
 	// Identify mode.
 	var mode Mode
 
-	// If STDIN is provided, we are in "edit mode". Otherwise,
-	// we are in "complete mode".
-	if fi.Mode()&os.ModeCharDevice == 0 {
+	// Check if the user wants to start a chat session.
+	if len(args) == 1 && args[0] == "chat" {
+		mode = ModeChat
+	} else if fi.Mode()&os.ModeCharDevice == 0 {
 		mode = ModeEdit
 	} else {
 		mode = ModeComplete
 	}
 
-	// Wait maxiumum of 30 seconds for a response.
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	// Wait maxiumum of 120 seconds for a response, which provides
+	// a lot of time for the API to respond, but it should a matter
+	// of seconds, not minutes.
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
 	// Handle requests based on the mode.
 	switch mode {
+	case ModeChat:
+		startChat(client)
 	case ModeEdit:
 		// Read up to 4096 characters from STDIN.
 		b := make([]byte, 4096)
@@ -133,4 +147,71 @@ func main() {
 		// Print the output.
 		fmt.Println(strings.Trim(resp.Choices[0].Text, "\n"))
 	}
+}
+
+// startChat starts an interactive chat session with the OpenAI API, this is a REPL-like
+// command-line program that allows you to chat with the API.
+func startChat(client *openai.Client) {
+	// Print a welcome message to explain how to use the chat mode.
+	fmt.Print("Welcome to the OpenAI API CLI chat mode. Type '\033[2mexit\033[0m' to quit.\n\n")
+
+	messages := []openai.ChatMessage{}
+
+	for {
+		// Print a prompt to the user using bold ANSI escape codes.
+		fmt.Printf("\033[1m> \033[0m")
+
+		// Read up to 4096 characters from STDIN.
+		b := make([]byte, 4096)
+		n, err := io.ReadAtLeast(os.Stdin, b, 1)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s", err)
+			os.Exit(1)
+		}
+
+		// Get the user input.
+		input := strings.Trim(string(b[:n]), "\r")
+
+		// Check if the user wants to exit.
+		if strings.TrimSpace(input) == "exit" {
+			break
+		}
+
+		messages = append(messages, openai.ChatMessage{
+			Role:    openai.ChatRoleUser,
+			Content: input,
+		})
+
+		resp, err := chatRequest(client, messages)
+
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s", err)
+			os.Exit(1)
+		}
+
+		// Print the output using ASNI dim escape codes.
+		fmt.Print("\n\033[2m")
+		fmt.Println(strings.TrimSpace(resp.Choices[0].Message.Content))
+		fmt.Print("\033[0m\n")
+	}
+}
+
+func chatRequest(client *openai.Client, messages []openai.ChatMessage) (*openai.CreateChatResponse, error) {
+	// Wait maxiumum of 120 seconds for a response, which provides
+	// a lot of time for the API to respond, but it should a matter
+	// of seconds, not minutes.
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+
+	// Create completion request.
+	resp, err := client.CreateChat(ctx, &openai.CreateChatRequest{
+		Model:     openai.ModelGPT35Turbo, // openai.ModelCodeDavinci002 ?
+		Messages:  messages,
+		MaxTokens: 2048,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
 }
