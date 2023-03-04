@@ -1,6 +1,6 @@
 # OpenAI
  
-> **Warning**: this is a work in progress Go client implementation for OpenAI's API.
+Go client package and CLI for OpenAI's API.
 
 ```console
 $ go get -v github.com/picatz/openai
