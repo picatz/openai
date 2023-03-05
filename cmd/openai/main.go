@@ -155,6 +155,7 @@ func startChat(client *openai.Client) {
 	// Print a welcome message to explain how to use the chat mode.
 	fmt.Print("Welcome to the OpenAI API CLI chat mode. Type '\033[2mexit\033[0m' to quit.\n\n")
 
+	// Keep track of the chat messages, both from the user and the API.
 	messages := []openai.ChatMessage{}
 
 	for {
@@ -177,6 +178,7 @@ func startChat(client *openai.Client) {
 			break
 		}
 
+		// Add the user input to the messages.
 		messages = append(messages, openai.ChatMessage{
 			Role:    openai.ChatRoleUser,
 			Content: input,
@@ -193,6 +195,9 @@ func startChat(client *openai.Client) {
 		fmt.Print("\n\033[2m")
 		fmt.Println(strings.TrimSpace(resp.Choices[0].Message.Content))
 		fmt.Print("\033[0m\n")
+
+		// Add the bot response to the messages.
+		messages = append(messages, resp.Choices[0].Message)
 	}
 }
 
