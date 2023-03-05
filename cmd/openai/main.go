@@ -153,14 +153,18 @@ func main() {
 // command-line program that allows you to chat with the API.
 func startChat(client *openai.Client) {
 	// Print a welcome message to explain how to use the chat mode.
-	fmt.Print("Welcome to the OpenAI API CLI chat mode. Type '\033[2mexit\033[0m' to quit.\n\n")
+	fmt.Print("Welcome to the OpenAI API CLI chat mode. Type '\033[2mdelete\033[0m' to forget last message. Type '\033[2mexit\033[0m' to quit.\n\n")
 
 	// Keep track of the chat messages, both from the user and the API.
 	messages := []openai.ChatMessage{}
 
+	var systemMessage openai.ChatMessage
+
+	tokens := 0
+
 	for {
 		// Print a prompt to the user using bold ANSI escape codes.
-		fmt.Printf("\033[1m> \033[0m")
+		fmt.Printf("\033[1m(messages: %d: tokens: %d)> \033[0m", len(messages), tokens)
 
 		// Read up to 4096 characters from STDIN.
 		b := make([]byte, 4096)
@@ -176,6 +180,32 @@ func startChat(client *openai.Client) {
 		// Check if the user wants to exit.
 		if strings.TrimSpace(input) == "exit" {
 			break
+		}
+
+		// Check if the user wants to erase.
+		if strings.TrimSpace(input) == "delete" {
+			// Remove the last message.
+			if len(messages) > 0 {
+				messages = messages[:len(messages)-1]
+			}
+			continue
+		}
+
+		// Add the system message to the messages if the input starts with "system:".
+		//
+		// Note, you wouldn't want to do this if didn't trust the user. But, it's a nice
+		// way to add some context to the chat session.
+		if strings.HasPrefix(input, "system:") {
+			// Add the system message to the messages.
+			systemMessage = openai.ChatMessage{
+				Role:    openai.ChatRoleSystem,
+				Content: input,
+			}
+			messages = append(messages, systemMessage)
+			fmt.Print("\n\033[2m")
+			fmt.Println("Configured system.")
+			fmt.Print("\033[0m\n")
+			continue
 		}
 
 		// Add the user input to the messages.
@@ -198,6 +228,26 @@ func startChat(client *openai.Client) {
 
 		// Add the bot response to the messages.
 		messages = append(messages, resp.Choices[0].Message)
+
+		// Keep track of tokens used for the session to avoid going over the limit
+		// which is 4096
+		tokens += resp.Usage.TotalTokens
+
+		if tokens > 4000 {
+			summary, summaryTokens := summarizeMessages(client, messages, 0)
+
+			// Reset the messages to the summary.
+			messages = []openai.ChatMessage{}
+
+			// Add the summary to the messages.
+			messages = append(messages, openai.ChatMessage{
+				Role:    openai.ChatRoleSystem,
+				Content: "Summary of previous messages for context: " + summary,
+			})
+
+			// Reset the token count.
+			tokens = summaryTokens
+		}
 	}
 }
 
@@ -205,7 +255,7 @@ func chatRequest(client *openai.Client, messages []openai.ChatMessage) (*openai.
 	// Wait maxiumum of 120 seconds for a response, which provides
 	// a lot of time for the API to respond, but it should a matter
 	// of seconds, not minutes.
-	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	ctx, cancel := reqCtx()
 	defer cancel()
 
 	// Create completion request.
@@ -219,4 +269,47 @@ func chatRequest(client *openai.Client, messages []openai.ChatMessage) (*openai.
 	}
 
 	return resp, nil
+}
+
+func reqCtx() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), 120*time.Second)
+}
+
+// summarizeMessages summarizes the messages using the OpenAI API.
+func summarizeMessages(client *openai.Client, messages []openai.ChatMessage, attempts int) (string, int) {
+	// Create a prompt from the messages.
+	prompt := []string{}
+	prompt = append(prompt, "Generate a summary of previous chat messages for context:")
+	for _, m := range messages {
+		prompt = append(prompt, fmt.Sprintf("%s: %s", m.Role, m.Content))
+	}
+
+	// Create a context with a timeout of 120 seconds.
+	ctx, cancel := reqCtx()
+	defer cancel()
+
+	// Track the number of attempts for retries.
+	attempts++
+
+	// Create completion request.
+	resp, err := client.CreateCompletion(ctx, &openai.CreateCompletionRequest{
+		Model:     openai.ModelGPT35Turbo,
+		Prompt:    prompt,
+		MaxTokens: 1024,
+	})
+	if err != nil {
+		// TODO: This is a hack to handle the 429 error. We should handle this better.
+		if attempts < 5 && strings.Contains(err.Error(), " unexpected status code: 429: Too Many Request") {
+			// If we get a 429 error, it means we've exceeded the API rate limit.
+			// In this case, we'll just wait 5 seconds and try again.
+			time.Sleep(5 * time.Second)
+
+			// Try again.
+			return summarizeMessages(client, messages, attempts)
+		}
+		fmt.Fprintf(os.Stderr, "failed to summarize previous chat messages after %d attempts: %s", attempts, err)
+		os.Exit(1)
+	}
+
+	return resp.Choices[0].Text, resp.Usage.TotalTokens
 }
