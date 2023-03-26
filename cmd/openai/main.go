@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/picatz/openai"
 )
 
@@ -227,10 +229,13 @@ func startChat(client *openai.Client, model string) {
 			os.Exit(1)
 		}
 
-		// Print the output using ASNI dim escape codes.
-		fmt.Print("\n\033[2m")
-		fmt.Println(strings.TrimSpace(resp.Choices[0].Message.Content))
-		fmt.Print("\033[0m\n")
+		// Print the output using markdown-friendly terminal rendering.
+		s, err := glamour.Render(resp.Choices[0].Message.Content, "dark")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s", err)
+			os.Exit(1)
+		}
+		fmt.Println(s)
 
 		// Add the bot response to the messages.
 		messages = append(messages, resp.Choices[0].Message)
@@ -241,6 +246,18 @@ func startChat(client *openai.Client, model string) {
 
 		if tokens > 4000 {
 			summary, summaryTokens := summarizeMessages(client, model, messages, 0)
+
+			// Print the generated summary so the user can see what the bot is
+			// thinking the conversation is about to inject any additional context
+			// that was forgotten or missed.
+			fmt.Println(
+				lipgloss.NewStyle().
+					Width(80).
+					Background(lipgloss.Color("69")).
+					Foreground(lipgloss.Color("15")).
+					Padding(1, 2).
+					Render(summary),
+			)
 
 			// Reset the messages to the summary.
 			messages = []openai.ChatMessage{}
