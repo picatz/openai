@@ -46,6 +46,10 @@ import (
 //
 // 	$ openai chat
 //  ...
+//  > system: You are a X, only do Y and Z. Not A, B, C.
+//  ...
+//  > Whatever you want to say to the AI
+//  ...
 
 // Mode of operation.
 type Mode string
@@ -68,7 +72,8 @@ func main() {
 	}
 
 	if model == "" {
-		// TODO: in the future, make this GPT-4 by default when it's more widely available.
+		// TODO: maybe pre-flight check to see if GPT4 is available when not OPENAI_MODEL isn't set?
+		//       Then, in the future, make this GPT-4 by default when it's more widely available.
 		model = openai.ModelGPT35Turbo
 	}
 
