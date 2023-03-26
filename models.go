@@ -161,5 +161,10 @@ const (
 	ModelGPT35Turbo     Model = "gpt-3.5-turbo"
 	ModelGPT35Turbo0301 Model = "gpt-3.5-turbo-0301"
 
+	ModelGPT4        = "gpt-4"
+	ModelGPT40314    = "gpt-4-0314"
+	ModelGPT432K     = "gpt-4-32k"
+	ModelGPT432K0314 = "gpt-4-32k-0314"
+
 	// TODO: add more "known" models.
 )
