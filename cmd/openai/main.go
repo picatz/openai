@@ -277,24 +277,53 @@ func reqCtx(timeout time.Duration) (context.Context, context.CancelFunc) {
 
 // summarizeMessages summarizes the messages using the OpenAI API.
 func summarizeMessages(client *openai.Client, messages []openai.ChatMessage, attempts int) (string, int) {
-	// Create a prompt from the messages.
-	prompt := []string{}
-	prompt = append(prompt, "Generate a summary of previous chat messages for context:")
-	for _, m := range messages {
-		prompt = append(prompt, fmt.Sprintf("%s: %s", m.Role, m.Content))
+	// Create a context with a timeout of 5 minutes.
+	ctx, cancel := reqCtx(5 * time.Minute)
+	defer cancel()
+
+	summaryMsgs := []openai.ChatMessage{
+		{
+			Role: openai.ChatRoleSystem,
+			Content: strings.Join(
+				[]string{
+					"You are an expert at summarizing conversations.",
+					"Write a detailed recap of the given conversation, including all the important information produced by the bot to continue having the conversation.",
+					"Ensure to inclue all the people, places, and things said by the bot.",
+					"The summary must be at least 100 characters long.",
+					"Your summary should be no more than 2048 characters long.",
+					"Ignore any irelevant information from the conversation that doesn't seem to fit.",
+				}, " ",
+			),
+		},
 	}
 
-	// Create a context with a timeout of 120 seconds.
-	ctx, cancel := reqCtx()
-	defer cancel()
+	b := strings.Builder{}
+
+	for _, m := range messages {
+		if m.Role == openai.ChatRoleSystem {
+			continue
+		}
+		if m.Role == openai.ChatRoleUser {
+			b.WriteString("User: ")
+		} else {
+			b.WriteString("Bot: ")
+		}
+		b.WriteString(m.Content)
+		b.WriteString("\n\n")
+	}
+
+	summaryMsgs = append(summaryMsgs, openai.ChatMessage{
+		Role:    openai.ChatRoleUser,
+		Content: b.String(),
+	})
 
 	// Track the number of attempts for retries.
 	attempts++
 
 	// Create completion request.
-	resp, err := client.CreateCompletion(ctx, &openai.CreateCompletionRequest{
+	resp, err := client.CreateChat(ctx, &openai.CreateChatRequest{
 		Model:     openai.ModelGPT35Turbo,
-		Prompt:    prompt,
+		Messages:  summaryMsgs,
 		MaxTokens: 1024,
 	})
 	if err != nil {
@@ -311,5 +340,5 @@ func summarizeMessages(client *openai.Client, messages []openai.ChatMessage, att
 		os.Exit(1)
 	}
 
-	return resp.Choices[0].Text, resp.Usage.TotalTokens
+	return resp.Choices[0].Message.Content, resp.Usage.TotalTokens
 }
