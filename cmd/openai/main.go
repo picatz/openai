@@ -252,10 +252,10 @@ func startChat(client *openai.Client) {
 }
 
 func chatRequest(client *openai.Client, messages []openai.ChatMessage) (*openai.CreateChatResponse, error) {
-	// Wait maxiumum of 120 seconds for a response, which provides
+	// Wait maxiumum of 5 minutes for a response, which provides
 	// a lot of time for the API to respond, but it should a matter
 	// of seconds, not minutes.
-	ctx, cancel := reqCtx()
+	ctx, cancel := reqCtx(5 * time.Minute)
 	defer cancel()
 
 	// Create completion request.
@@ -271,8 +271,8 @@ func chatRequest(client *openai.Client, messages []openai.ChatMessage) (*openai.
 	return resp, nil
 }
 
-func reqCtx() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), 120*time.Second)
+func reqCtx(timeout time.Duration) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), timeout)
 }
 
 // summarizeMessages summarizes the messages using the OpenAI API.
