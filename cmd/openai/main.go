@@ -58,10 +58,16 @@ const (
 func main() {
 	// Check if we have an API key.
 	apiKey := os.Getenv("OPENAI_API_KEY")
+	model := os.Getenv("OPENAI_MODEL")
 
 	if apiKey == "" {
 		fmt.Fprintln(os.Stderr, "OPENAI_API_KEY environment variable is not set")
 		os.Exit(1)
+	}
+
+	if model == "" {
+		// TODO: in the future, make this GPT-4 by default when it's more widely available.
+		model = openai.ModelGPT35Turbo
 	}
 
 	// Check if we have any arguments.
@@ -103,7 +109,7 @@ func main() {
 	// Handle requests based on the mode.
 	switch mode {
 	case ModeChat:
-		startChat(client)
+		startChat(client, model)
 	case ModeEdit:
 		// Read up to 4096 characters from STDIN.
 		b := make([]byte, 4096)
@@ -151,7 +157,7 @@ func main() {
 
 // startChat starts an interactive chat session with the OpenAI API, this is a REPL-like
 // command-line program that allows you to chat with the API.
-func startChat(client *openai.Client) {
+func startChat(client *openai.Client, model string) {
 	// Print a welcome message to explain how to use the chat mode.
 	fmt.Print("Welcome to the OpenAI API CLI chat mode. Type '\033[2mdelete\033[0m' to forget last message. Type '\033[2mexit\033[0m' to quit.\n\n")
 
@@ -194,7 +200,7 @@ func startChat(client *openai.Client) {
 		// Add the system message to the messages if the input starts with "system:".
 		//
 		// Note, you wouldn't want to do this if didn't trust the user. But, it's a nice
-		// way to add some context to the chat session.
+		// way to add some context to the chat session for a CLI program.
 		if strings.HasPrefix(input, "system:") {
 			// Add the system message to the messages.
 			systemMessage = openai.ChatMessage{
@@ -214,7 +220,7 @@ func startChat(client *openai.Client) {
 			Content: input,
 		})
 
-		resp, err := chatRequest(client, messages)
+		resp, err := chatRequest(client, model, messages)
 
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s", err)
@@ -234,7 +240,7 @@ func startChat(client *openai.Client) {
 		tokens += resp.Usage.TotalTokens
 
 		if tokens > 4000 {
-			summary, summaryTokens := summarizeMessages(client, messages, 0)
+			summary, summaryTokens := summarizeMessages(client, model, messages, 0)
 
 			// Reset the messages to the summary.
 			messages = []openai.ChatMessage{}
@@ -251,7 +257,7 @@ func startChat(client *openai.Client) {
 	}
 }
 
-func chatRequest(client *openai.Client, messages []openai.ChatMessage) (*openai.CreateChatResponse, error) {
+func chatRequest(client *openai.Client, model string, messages []openai.ChatMessage) (*openai.CreateChatResponse, error) {
 	// Wait maxiumum of 5 minutes for a response, which provides
 	// a lot of time for the API to respond, but it should a matter
 	// of seconds, not minutes.
@@ -260,7 +266,7 @@ func chatRequest(client *openai.Client, messages []openai.ChatMessage) (*openai.
 
 	// Create completion request.
 	resp, err := client.CreateChat(ctx, &openai.CreateChatRequest{
-		Model:     openai.ModelGPT35Turbo, // openai.ModelCodeDavinci002 ?
+		Model:     model,
 		Messages:  messages,
 		MaxTokens: 2048,
 	})
@@ -276,7 +282,7 @@ func reqCtx(timeout time.Duration) (context.Context, context.CancelFunc) {
 }
 
 // summarizeMessages summarizes the messages using the OpenAI API.
-func summarizeMessages(client *openai.Client, messages []openai.ChatMessage, attempts int) (string, int) {
+func summarizeMessages(client *openai.Client, model string, messages []openai.ChatMessage, attempts int) (string, int) {
 	// Create a context with a timeout of 5 minutes.
 	ctx, cancel := reqCtx(5 * time.Minute)
 	defer cancel()
@@ -322,7 +328,7 @@ func summarizeMessages(client *openai.Client, messages []openai.ChatMessage, att
 
 	// Create completion request.
 	resp, err := client.CreateChat(ctx, &openai.CreateChatRequest{
-		Model:     openai.ModelGPT35Turbo,
+		Model:     model,
 		Messages:  summaryMsgs,
 		MaxTokens: 1024,
 	})
@@ -334,7 +340,7 @@ func summarizeMessages(client *openai.Client, messages []openai.ChatMessage, att
 			time.Sleep(5 * time.Second)
 
 			// Try again.
-			return summarizeMessages(client, messages, attempts)
+			return summarizeMessages(client, model, messages, attempts)
 		}
 		fmt.Fprintf(os.Stderr, "failed to summarize previous chat messages after %d attempts: %s", attempts, err)
 		os.Exit(1)
