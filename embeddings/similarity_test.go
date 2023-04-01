@@ -373,7 +373,69 @@ func TestEuclideanDistance(t *testing.T) {
 			})
 		}
 	})
+}
 
+func TestHammingDistance(t *testing.T) {
+	t.Run("return error for unequal length embeddings", func(t *testing.T) {
+		_, err := HammingDistance([]float64{1, 2, 3}, []float64{1, 2, 3, 4})
+		if err == nil {
+			t.Fatal("expected error")
+		}
+	})
+
+	t.Run("return 0.0 for identical embeddings", func(t *testing.T) {
+		dist, err := HammingDistance([]float64{1, 2, 3}, []float64{1, 2, 3})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		distStr := fmt.Sprintf("%.1f", dist)
+
+		if distStr != "0.0" {
+			t.Fatalf("expected distance to be 0.0, got %f", dist)
+		}
+	})
+
+	t.Run("return 0.0 for zero embeddings", func(t *testing.T) {
+		dist, err := HammingDistance([]float64{0, 0, 0}, []float64{0, 0, 0})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		disStr := fmt.Sprintf("%.1f", dist)
+
+		if disStr != "0.0" {
+			t.Fatalf("expected distance to be 0.0, got %f", dist)
+		}
+	})
+
+	t.Run("return 2.0 for orthogonal embeddings", func(t *testing.T) {
+		dist, err := HammingDistance([]float64{1, 0, 0}, []float64{0, 1, 0})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		disStr := fmt.Sprintf("%.1f", dist)
+
+		if disStr != "2.0" {
+			t.Fatalf("expected distance to be 2.0, got %f", dist)
+		}
+	})
+
+	t.Run("return 3.0 for opposite embeddings", func(t *testing.T) {
+		dist, err := HammingDistance([]float64{0, 0, 0.5}, []float64{0.5, 0.5, 0})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		distStr := fmt.Sprintf("%.1f", dist)
+
+		if distStr != "3.0" {
+			t.Fatalf("expected distance to be 3.0, got %q", distStr)
+		}
+	})
+
+	// Note: not useful for OpenAI's embeddings.
 }
 
 func TestManhattanDistance(t *testing.T) {

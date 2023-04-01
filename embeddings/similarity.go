@@ -195,3 +195,25 @@ func SpearmanRankCorrelationCoefficient(a, b []float64) (float64, error) {
 
 	return cov / math.Sqrt(varA*varB), nil
 }
+
+// HammingDistance calculates the Hamming distance between two embeddings.
+// It calculates the sum of absolute differences between the two embeddings.
+//
+// This is primarily used for binary representations of embeddings. It is not
+// very good for continuous embeddings like OpenAI's.
+//
+// https://en.wikipedia.org/wiki/Hamming_distance
+func HammingDistance(a, b []float64) (float64, error) {
+	if len(a) != len(b) {
+		return 0, errors.New("embeddings must have equal lengths")
+	}
+
+	var sum float64
+	for i := 0; i < len(a); i++ {
+		if a[i] != b[i] {
+			sum++
+		}
+	}
+
+	return sum, nil
+}
