@@ -374,6 +374,165 @@ func TestEuclideanDistance(t *testing.T) {
 
 }
 
+func TestManhattanDistance(t *testing.T) {
+	t.Run("return error for unequal length embeddings", func(t *testing.T) {
+		_, err := ManhattanDistance([]float64{1, 2, 3}, []float64{1, 2, 3, 4})
+		if err == nil {
+			t.Fatal("expected error")
+		}
+	})
+
+	t.Run("return 0.0 for identical embeddings", func(t *testing.T) {
+		dist, err := ManhattanDistance([]float64{1, 2, 3}, []float64{1, 2, 3})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		distStr := fmt.Sprintf("%.1f", dist)
+
+		if distStr != "0.0" {
+			t.Fatalf("expected distance to be 0.0, got %f", dist)
+		}
+	})
+
+	t.Run("return 0.0 for zero embeddings", func(t *testing.T) {
+		dist, err := ManhattanDistance([]float64{0, 0, 0}, []float64{0, 0, 0})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		disStr := fmt.Sprintf("%.1f", dist)
+
+		if disStr != "0.0" {
+			t.Fatalf("expected distance to be 0.0, got %f", dist)
+		}
+	})
+
+	t.Run("return -0.5 for orthogonal embeddings", func(t *testing.T) {
+		dist, err := PearsonCorrelationCoefficient([]float64{1, 0, 0}, []float64{0, 1, 0})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		disStr := fmt.Sprintf("%.1f", dist)
+
+		if disStr != "-0.5" {
+			t.Fatalf("expected distance to be -0.5, got %f", dist)
+		}
+	})
+
+	t.Run("return -1.0 for opposite embeddings", func(t *testing.T) {
+		dist, err := PearsonCorrelationCoefficient([]float64{0, 0, 0.5}, []float64{0.5, 0.5, 0})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		distStr := fmt.Sprintf("%.1f", dist)
+
+		if distStr != "-1.0" {
+			t.Fatalf("expected distance to be -1.0, got %q", distStr)
+		}
+	})
+
+	t.Run("a,b", func(t *testing.T) {
+		client := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
+
+		getEmbedding := func(t *testing.T, input string) []float64 {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			resp, err := client.CreateEmbedding(ctx, &openai.CreateEmbeddingRequest{
+				Model: openai.ModelTextEmbeddingAda002,
+				Input: input,
+			})
+			if err != nil {
+				t.Fatalf("failed to create embedding: %v", err)
+			}
+
+			return resp.Data[0].Embedding
+		}
+
+		tests := []struct {
+			a          []float64
+			b          []float64
+			wantApprox string
+		}{
+			{
+				a:          getEmbedding(t, "Can you tell me about the history of the universe?"),
+				b:          getEmbedding(t, "茶"),
+				wantApprox: "24.3",
+			},
+			{
+				a:          getEmbedding(t, "Can you tell me about the history of the universe?"),
+				b:          getEmbedding(t, "後でラーメンを食べに行きます"),
+				wantApprox: "25.0",
+			},
+			{
+				a:          getEmbedding(t, "Can you tell me about the history of the universe?"),
+				b:          getEmbedding(t, "SolidGoldMajikarp"),
+				wantApprox: "23.",
+			},
+			{
+				a:          getEmbedding(t, "Can you tell me about the history of the universe?"),
+				b:          getEmbedding(t, "Ketchup is bad."),
+				wantApprox: "23.",
+			},
+			{
+				a:          getEmbedding(t, "Can you tell me about the history of the universe?"),
+				b:          getEmbedding(t, "AHHHHHHHH!"),
+				wantApprox: "21.7",
+			},
+			{
+				a:          getEmbedding(t, "Can you tell me about the history of the universe?"),
+				b:          getEmbedding(t, "The big bang theory tells us that the universe began with a bang."),
+				wantApprox: "17.7",
+			},
+			{
+				a:          getEmbedding(t, "Can you tell me about the history of the universe?"),
+				b:          getEmbedding(t, "How did the universe begin?"),
+				wantApprox: "13.1",
+			},
+			{
+				a:          getEmbedding(t, "Can you tell me about the history of the universe?"),
+				b:          getEmbedding(t, "Can you tell me about the universe?."),
+				wantApprox: "9.7",
+			},
+			{
+				a:          getEmbedding(t, "Can you tell me about the history of the universe?"),
+				b:          getEmbedding(t, "Tell me about the history of the universe, please?"),
+				wantApprox: "6.6",
+			},
+			{
+				a:          getEmbedding(t, "Can you tell me about the history of the universe?"),
+				b:          getEmbedding(t, "Can you tell me about the history of our universe?"),
+				wantApprox: "3.",
+			},
+			{
+				a:          getEmbedding(t, "Can you tell me about the history of the universe?"),
+				b:          getEmbedding(t, "Can you tell me about the history of the universe?"),
+				wantApprox: "0.0",
+			},
+		}
+
+		for ti, tt := range tests {
+			t.Run(fmt.Sprintf("%d", ti), func(t *testing.T) {
+				got, err := ManhattanDistance(tt.a, tt.b)
+				if err != nil {
+					t.Fatalf("error: %v", err)
+				}
+
+				t.Logf("test %d: %f", ti, got)
+
+				gotStr := fmt.Sprintf("%f", got)
+
+				if !strings.HasPrefix(gotStr, tt.wantApprox) {
+					t.Fatalf("got: %v, want: %v", gotStr, tt.wantApprox)
+				}
+			})
+		}
+	})
+}
+
 func TestPearsonCorrelationCoefficient(t *testing.T) {
 	t.Run("return error for unequal length embeddings", func(t *testing.T) {
 		_, err := PearsonCorrelationCoefficient([]float64{1, 2, 3}, []float64{1, 2, 3, 4})
@@ -527,5 +686,4 @@ func TestPearsonCorrelationCoefficient(t *testing.T) {
 			})
 		}
 	})
-
 }

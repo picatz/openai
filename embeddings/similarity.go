@@ -81,3 +81,24 @@ func PearsonCorrelationCoefficient(a, b []float64) (float64, error) {
 
 	return numerator / denominator, nil
 }
+
+// ManhattanDistance calculates the Manhattan distance between two embeddings.
+// Also known as the L1 distance, it measures the distance between two points
+// by summing the absolute differences between their corresponding coordinates.
+//
+// In other words, it measures the total "city block" distance traveled between
+// the two points.
+//
+// https://en.wikipedia.org/wiki/Taxicab_geometry
+func ManhattanDistance(a, b []float64) (float64, error) {
+	if len(a) != len(b) {
+		return 0, errors.New("embeddings must have equal lengths")
+	}
+
+	var sum float64
+	for i := 0; i < len(a); i++ {
+		sum += math.Abs(a[i] - b[i])
+	}
+
+	return sum, nil
+}
