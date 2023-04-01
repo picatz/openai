@@ -217,3 +217,27 @@ func HammingDistance(a, b []float64) (float64, error) {
 
 	return sum, nil
 }
+
+// BrayCurtisDistance calculates the Bray-Curtis distance between two embeddings.
+// It calculates the sum of absolute differences between the two embeddings,
+// divided by the sum of their absolute values.
+//
+// https://en.wikipedia.org/wiki/Bray%E2%80%93Curtis_dissimilarity
+func BrayCurtisDistance(a, b []float64) (float64, error) {
+	if len(a) != len(b) {
+		return 0, errors.New("embeddings must have equal lengths")
+	}
+
+	var sumA, sumB float64
+	for i := 0; i < len(a); i++ {
+		sumA += a[i]
+		sumB += b[i]
+	}
+
+	var sum float64
+	for i := 0; i < len(a); i++ {
+		sum += math.Abs(a[i]-b[i]) / (sumA + sumB)
+	}
+
+	return sum, nil
+}
