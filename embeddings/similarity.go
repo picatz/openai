@@ -54,3 +54,30 @@ func EuclideanDistance(a, b []float64) (float64, error) {
 	distance := math.Sqrt(sumSquares)
 	return distance, nil
 }
+
+// PearsonCorrelationCoefficient returns the Pearson correlation coefficient
+// between two embeddings. This is a measure of the linear correlation between
+// two embeddings (continuous variables), and it ranges from -1 (perfect negative
+// correlation) to 1 (perfect positive correlation). It can be used to compare
+// embeddings by quantifying the linear relationship between them.
+//
+// https://en.wikipedia.org/wiki/Pearson_correlation_coefficient
+func PearsonCorrelationCoefficient(a, b []float64) (float64, error) {
+	if len(a) != len(b) {
+		return 0, errors.New("embeddings must have equal lengths")
+	}
+
+	var sumA, sumB, sumASquared, sumBSquared, sumAB float64
+	for i := 0; i < len(a); i++ {
+		sumA += a[i]
+		sumB += b[i]
+		sumASquared += a[i] * a[i]
+		sumBSquared += b[i] * b[i]
+		sumAB += a[i] * b[i]
+	}
+
+	numerator := sumAB - (sumA * sumB / float64(len(a)))
+	denominator := math.Sqrt((sumASquared - (sumA * sumA / float64(len(a)))) * (sumBSquared - (sumB * sumB / float64(len(a)))))
+
+	return numerator / denominator, nil
+}
