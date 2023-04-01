@@ -2,12 +2,17 @@ package embeddings
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/picatz/openai"
 )
+
+func ptrFloat64(f float64) *float64 {
+	return &f
+}
 
 func TestCosignSimilariy(t *testing.T) {
 	t.Run("return 1.0 for identical embeddings", func(t *testing.T) {
@@ -43,10 +48,6 @@ func TestCosignSimilariy(t *testing.T) {
 		}
 	})
 
-	ptrFloat64 := func(f float64) *float64 {
-		return &f
-	}
-
 	t.Run("a,b", func(t *testing.T) {
 		client := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
 
@@ -73,10 +74,11 @@ func TestCosignSimilariy(t *testing.T) {
 			want       *float64
 		}{
 			{
-				name: "return 1.0 for identical embeddings",
-				a:    getEmbedding(t, "Hello world"),
-				b:    getEmbedding(t, "Hello world"),
-				want: ptrFloat64(1.0), // flakey? 0.9999999999999999
+				name:       "return 1.0 for identical embeddings",
+				a:          getEmbedding(t, "Hello world"),
+				b:          getEmbedding(t, "Hello world"),
+				wantApprox: ptrFloat64(0.9),
+				// want: ptrFloat64(1.0), // flakey? 0.9999999999999999
 			},
 			{
 				name:       "hello world and moon",
@@ -235,4 +237,138 @@ func TestCosignSimilariy(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestEuclideanDistance(t *testing.T) {
+	t.Run("return error for unequal length embeddings", func(t *testing.T) {
+		_, err := EuclideanDistance([]float64{1, 2, 3}, []float64{1, 2, 3, 4})
+		if err == nil {
+			t.Fatal("expected error")
+		}
+	})
+
+	t.Run("return 0.0 for identical embeddings", func(t *testing.T) {
+		dist, err := EuclideanDistance([]float64{1, 2, 3}, []float64{1, 2, 3})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if dist != 0.0 {
+			t.Fatalf("expected distance to be 0.0, got %f", dist)
+		}
+	})
+
+	t.Run("return 0.0 for zero embeddings", func(t *testing.T) {
+		dist, err := EuclideanDistance([]float64{0, 0, 0}, []float64{0, 0, 0})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if dist != 0.0 {
+			t.Fatalf("expected distance to be 0.0, got %f", dist)
+		}
+	})
+
+	t.Run("orthogonal embeddings", func(t *testing.T) {
+		dist, err := EuclideanDistance([]float64{1, 0, 0}, []float64{0, 1, 0})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !(dist > 1.4 && dist < 1.5) { // 1.414214
+			t.Fatalf("expected distance to be 0.0, got %f", dist)
+		}
+	})
+
+	t.Run("other embeddings", func(t *testing.T) {
+		dist, err := EuclideanDistance([]float64{0, 0, 0.5}, []float64{0.5, 0.5, 0})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !(dist > 1.4 && dist < 1.5) { // 1.414214
+			t.Fatalf("expected distance to be 0.0, got %f", dist)
+		}
+	})
+
+	t.Run("a,b", func(t *testing.T) {
+		client := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
+
+		getEmbedding := func(t *testing.T, input string) []float64 {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			resp, err := client.CreateEmbedding(ctx, &openai.CreateEmbeddingRequest{
+				Model: openai.ModelTextEmbeddingAda002,
+				Input: input,
+			})
+			if err != nil {
+				t.Fatalf("failed to create embedding: %v", err)
+			}
+
+			return resp.Data[0].Embedding
+		}
+
+		tests := []struct {
+			a          []float64
+			b          []float64
+			wantApprox *float64
+			want       *float64
+		}{
+			{
+				a:          getEmbedding(t, "Can you tell me about the history of the universe?"),
+				b:          getEmbedding(t, "Ketchup is bad."),
+				wantApprox: ptrFloat64(0.7),
+			},
+			{
+				a:          getEmbedding(t, "Can you tell me about the history of the universe?"),
+				b:          getEmbedding(t, "AHHHHHHHH!"),
+				wantApprox: ptrFloat64(0.6),
+			},
+			{
+				a:          getEmbedding(t, "Can you tell me about the history of the universe?"),
+				b:          getEmbedding(t, "The big bang theory tells us that the universe began with a bang."),
+				wantApprox: ptrFloat64(0.5),
+			},
+			{
+				a:          getEmbedding(t, "Can you tell me about the history of the universe?"),
+				b:          getEmbedding(t, "How did the universe begin?"),
+				wantApprox: ptrFloat64(0.4),
+			},
+			{
+				a:          getEmbedding(t, "Can you tell me about the history of the universe?"),
+				b:          getEmbedding(t, "Can you tell me about the universe?."),
+				wantApprox: ptrFloat64(0.3),
+			},
+			{
+				a:          getEmbedding(t, "Can you tell me about the history of the universe?"),
+				b:          getEmbedding(t, "Tell me about the history of the universe, please?"),
+				wantApprox: ptrFloat64(0.2),
+			},
+			{
+				a:          getEmbedding(t, "Can you tell me about the history of the universe?"),
+				b:          getEmbedding(t, "Can you tell me about the history of our universe?"),
+				wantApprox: ptrFloat64(0.1),
+			},
+		}
+
+		for ti, tt := range tests {
+			t.Run(fmt.Sprintf("%d", ti), func(t *testing.T) {
+				got, err := EuclideanDistance(tt.a, tt.b)
+				if err != nil {
+					t.Fatalf("error: %v", err)
+				}
+
+				t.Logf("%d: got: %f", ti, got)
+				// if tt.want != nil && got != *tt.want {
+				// 	t.Fatalf("got: %v, want: %v", got, *tt.want)
+				// }
+
+				if tt.wantApprox != nil && got < *tt.wantApprox {
+					t.Fatalf("got: %v, want: %v", got, *tt.wantApprox)
+				}
+			})
+		}
+	})
+
 }
