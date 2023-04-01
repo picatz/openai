@@ -241,3 +241,39 @@ func BrayCurtisDistance(a, b []float64) (float64, error) {
 
 	return sum, nil
 }
+
+// MahalanobisDistance calculates the Mahalanobis distance between two embeddings.
+// It calculates the distance between two embeddings, taking into account the
+// variance of the data.
+//
+// The covariance matrix is a square matrix that describes the covariance
+// between the embeddings. It must be the same size as the embeddings.
+// https://en.wikipedia.org/wiki/Covariance_matrix
+//
+// # Example
+//
+//	covarianceMatrix := [][]float64{
+//	    []float64{1, 0.5},
+//	    []float64{0.5, 1},
+//	}
+//	distance, err := MahalanobisDistance([]float64{1, 2}, []float64{3, 4}, covarianceMatrix)
+//
+// https://en.wikipedia.org/wiki/Mahalanobis_distance
+func MahalanobisDistance(a, b []float64, covarianceMatrix [][]float64) (float64, error) {
+	if len(a) != len(b) {
+		return 0, errors.New("embeddings must have equal lengths")
+	}
+
+	if len(a) != len(covarianceMatrix) {
+		return 0, errors.New("covariance matrix must be square and have the same dimensions as the embeddings")
+	}
+
+	var sum float64
+	for i := 0; i < len(a); i++ {
+		for j := 0; j < len(a); j++ {
+			sum += (a[i] - b[i]) * (a[j] - b[j]) * covarianceMatrix[i][j]
+		}
+	}
+
+	return math.Sqrt(sum), nil
+}
