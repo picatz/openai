@@ -687,3 +687,66 @@ func TestPearsonCorrelationCoefficient(t *testing.T) {
 		}
 	})
 }
+
+func TestJaquardSimilarity(t *testing.T) {
+	t.Run("return error for unequal length embeddings", func(t *testing.T) {
+		_, err := JaquardSimilarity([]float64{1, 2, 3}, []float64{1, 2, 3, 4})
+		if err == nil {
+			t.Fatal("expected error")
+		}
+	})
+
+	t.Run("return 1.0 for identical embeddings", func(t *testing.T) {
+		dist, err := JaquardSimilarity([]float64{1, 2, 3}, []float64{1, 2, 3})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		distStr := fmt.Sprintf("%.1f", dist)
+
+		if distStr != "1.0" {
+			t.Fatalf("expected distance to be 0.0, got %f", dist)
+		}
+	})
+
+	t.Run("return +Inf for zero embeddings", func(t *testing.T) {
+		dist, err := JaquardSimilarity([]float64{0, 0, 0}, []float64{0, 0, 0})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		disStr := fmt.Sprintf("%.1f", dist)
+
+		if disStr != "+Inf" {
+			t.Fatalf("expected distance to be +Inf, got %f", dist)
+		}
+	})
+
+	t.Run("return 0.5 for orthogonal embeddings", func(t *testing.T) {
+		dist, err := JaquardSimilarity([]float64{1, 0, 0}, []float64{0, 1, 0})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		disStr := fmt.Sprintf("%.1f", dist)
+
+		if disStr != "0.5" {
+			t.Fatalf("expected distance to be 0.5, got %f", dist)
+		}
+	})
+
+	t.Run("return 0.0 for opposite embeddings", func(t *testing.T) {
+		dist, err := JaquardSimilarity([]float64{0, 0, 0.5}, []float64{0.5, 0.5, 0})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		distStr := fmt.Sprintf("%.1f", dist)
+
+		if distStr != "0.0" {
+			t.Fatalf("expected distance to be 0.0, got %q", distStr)
+		}
+	})
+
+	// Note: not useful for OpenAI's (continuous) embeddings, but useful for other embeddings.
+}

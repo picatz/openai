@@ -102,3 +102,29 @@ func ManhattanDistance(a, b []float64) (float64, error) {
 
 	return sum, nil
 }
+
+// JaquardSimilarity calculates the Jaquard similarity between two embeddings.
+// This is a similarity measure for sets, defined as thee size of the intersection
+// divided by the size of the union of the two sets.
+//
+// It can be used for binary representations of embeddings, but it's not very
+// good for continuous embeddings like OpenAI's embeddings.
+//
+// https://en.wikipedia.org/wiki/Jaccard_index
+func JaquardSimilarity(a, b []float64) (float64, error) {
+	if len(a) != len(b) {
+		return 0, errors.New("embeddings must have equal lengths")
+	}
+
+	var intersection, union float64
+	for i := 0; i < len(a); i++ {
+		if a[i] == b[i] {
+			intersection++
+		}
+		if a[i] != 0 || b[i] != 0 {
+			union++
+		}
+	}
+
+	return intersection / union, nil
+}
