@@ -2,6 +2,7 @@ package embeddings
 
 import (
 	"errors"
+	"fmt"
 	"math"
 )
 
@@ -127,4 +128,70 @@ func JaquardSimilarity(a, b []float64) (float64, error) {
 	}
 
 	return intersection / union, nil
+}
+
+// rank returns the ranks of the values in the given slice, used for Spearman's
+// rank correlation coefficient.
+func rank(data []float64) []float64 {
+	ranks := make([]float64, len(data))
+	for idx, value := range data {
+		var rank float64
+		var rankSum float64
+		count := 0.0
+		for otherIdx, otherValue := range data {
+			if value < otherValue {
+				rank++
+			} else if value == otherValue {
+				if idx != otherIdx {
+					count++
+					rankSum += float64(otherIdx)
+				}
+			}
+		}
+		ranks[idx] = rank + (rankSum+float64(idx))/float64(count+1)
+	}
+	return ranks
+}
+
+// avg returns the average of the values in the given slice.
+func avg(data []float64) float64 {
+	var sum float64
+	for _, value := range data {
+		sum += value
+	}
+	return sum / float64(len(data))
+}
+
+// SpearmanRankCorrelationCoefficient returns the Spearman rank correlation
+// coefficient between two embeddings. This is a measure of the monotonic
+// relationship between two embeddings (continuous variables), and it ranges
+// from -1 (perfect negative correlation) to 1 (perfect positive correlation).
+//
+// You may notice it's very similar to Pearson's correlation coefficient, but
+// it's calculated on the ranks of the values instead of the values themselves.
+// This makes it more robust to outliers, but it's also more expensive to
+// calculate.
+//
+// https://en.wikipedia.org/wiki/Spearman%27s_rank_correlation_coefficient
+func SpearmanRankCorrelationCoefficient(a, b []float64) (float64, error) {
+	if len(a) != len(b) {
+		return 0, fmt.Errorf("arrays must be of the same length")
+	}
+
+	ar := rank(a)
+	br := rank(b)
+
+	averageA := avg(ar)
+	averageB := avg(br)
+
+	var cov, varA, varB float64
+	for i := 0; i < len(ar); i++ {
+		dA := ar[i] - averageA
+		dB := br[i] - averageB
+		cov += dA * dB
+		varA += dA * dA
+		varB += dB * dB
+	}
+
+	return cov / math.Sqrt(varA*varB), nil
 }
