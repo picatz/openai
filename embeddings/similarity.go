@@ -474,3 +474,23 @@ func AngularDistance(a, b []float64) (float64, error) {
 
 	return math.Acos(dot / (math.Sqrt(normA) * math.Sqrt(normB))), nil
 }
+
+// CorrelationDistance calculates the correlation distance between two embeddings.
+// This is a measure of the correlation between two vectors, and is useful for
+// comparing embeddings that represent directions.
+//
+// https://en.wikipedia.org/wiki/Correlation_distance
+func CorrelationDistance(a, b []float64) (float64, error) {
+	if len(a) != len(b) {
+		return 0, errors.New("embeddings must have equal lengths")
+	}
+
+	var dot, normA, normB float64
+	for i := 0; i < len(a); i++ {
+		dot += a[i] * b[i]
+		normA += a[i] * a[i]
+		normB += b[i] * b[i]
+	}
+
+	return 1 - (dot / (math.Sqrt(normA) * math.Sqrt(normB))), nil
+}
