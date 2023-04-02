@@ -362,3 +362,95 @@ func WassersteinDistance(a, b []float64) (float64, error) {
 
 	return distance, nil
 }
+
+// Softmax calculates the softmax of a slice of floats. This is used to
+// convert a vector of numbers into a probability distribution.
+func Softmax(x []float64) []float64 {
+	var sum float64
+	soft := make([]float64, len(x))
+	for _, v := range x {
+		sum += math.Exp(v)
+	}
+	for i, v := range x {
+		soft[i] = math.Exp(v) / sum
+	}
+	return soft
+}
+
+// KullbackLeiblerDivergence calculates the Kullback-Leibler divergence between two
+// embeddings. This measures the difference between two probability distributions
+// represented by continuous embeddings. Lower values indicate higher similarity
+// between the distributions.
+//
+// Ends up not being very useful for OpenAI's embeddings.
+//
+// https://en.wikipedia.org/wiki/Kullback%E2%80%93Leibler_divergence
+func KullbackLeiblerDivergence(p, q []float64) (float64, error) {
+	if len(p) != len(q) {
+		return 0, errors.New("distributions must have the same dimensions")
+	}
+
+	var divergence float64 = 0
+	for i := 0; i < len(p); i++ {
+		if p[i] > 0 {
+			if q[i] > 0 {
+				divergence += p[i] * (math.Log2(p[i]) - math.Log2(q[i]))
+			} else {
+				// If q[i] is 0, then the KL divergence is undefined.
+				return 0, errors.New("elements in q distribution should be positive")
+			}
+		}
+	}
+
+	return divergence, nil
+}
+
+// ShannonEntropy calculates the entropy of a probability distribution represented by
+// a continuous embedding.
+//
+// https://en.wikipedia.org/wiki/Entropy_(information_theory)
+func ShannonEntropy(p []float64) float64 {
+	var ent float64 = 0
+	for i := 0; i < len(p); i++ {
+		if p[i] > 0 {
+			ent += p[i] * math.Log2(p[i])
+		}
+	}
+	return -ent
+}
+
+// JensenShannonDivergence calculates the Jensen-Shannon divergence between two
+// embeddings. This measures the difference between two probability distributions
+// represented by continuous embeddings. Lower values indicate higher similarity
+// between the distributions.
+//
+// Ends up not being very useful for OpenAI's embeddings.
+//
+// https://en.wikipedia.org/wiki/Jensen%E2%80%93Shannon_divergence
+func JensenShannonDivergence(p, q []float64) (float64, error) {
+	if len(p) != len(q) {
+		return 0, errors.New("distributions must have the same dimensions")
+	}
+
+	// Handle negative values in the distributions
+	// with a softmax, which will normalize
+	pSoft := Softmax(p)
+	qSoft := Softmax(q)
+
+	m := make([]float64, len(pSoft))
+	for i := range pSoft {
+		m[i] = 0.5 * (pSoft[i] + qSoft[i])
+	}
+
+	dPm, err := KullbackLeiblerDivergence(p, m)
+	if err != nil {
+		return 0, err
+	}
+
+	dQm, err := KullbackLeiblerDivergence(q, m)
+	if err != nil {
+		return 0, err
+	}
+
+	return 0.5 * (dPm + dQm), nil
+}
