@@ -70,12 +70,24 @@ func Visualize(embeddings [][]float64, pointStroke, imgWidth, imgHeight int) (*i
 			if len(embeddings) > 1 {
 				// TODO: make this more robust.
 				switch embeddingIndex % 3 {
-				case 0:
+				case 0: // Red
 					pointColor.R = 255
-				case 1:
+
+					// TODO: make this more robust.
+					// pointColor.B = 0
+					// pointColor.G = 0
+				case 1: // Green
 					pointColor.G = 255
-				case 2:
+
+					// TODO: make this more robust.
+					// pointColor.B = 0
+					// pointColor.R = 0
+				case 2: // Blue
 					pointColor.B = 255
+
+					// TODO: make this more robust.
+					// pointColor.G = 0
+					// pointColor.R = 0
 				}
 			}
 

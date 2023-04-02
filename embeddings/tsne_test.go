@@ -29,53 +29,34 @@ func TestTSNEVisualizePNG(t *testing.T) {
 	}
 
 	// Note: this is a very small sample size and the results are not
-	//       representative of the model's performance. This is just a
-	//       simple test to make sure the code works, and it draws
-	//       something that looks kind'a cool.
+	//       representative of the model's performance.
 
-	// war := getEmbedding(t, "WAR")
-	// peace := getEmbedding(t, "PEACE")
-	// dogs := getEmbedding(t, "DOGS")
-	cats := getEmbedding(t, "CATS")
-	// superheroes := getEmbedding(t, "SUPERHEROES")
-	// villains := getEmbedding(t, "VILLAINS")
+	a := getEmbedding(t, "WHALES")
+	b := getEmbedding(t, "DOLPHINS")
+	c := getEmbedding(t, "BIRDS")
 
-	embeddings := [][]float64{}
-
-	for i := 0; i < 5; i++ {
-		// embeddings = append(embeddings, war)
-		// embeddings = append(embeddings, peace)
-		// embeddings = append(embeddings, dogs)
-		embeddings = append(embeddings, cats)
-		// embeddings = append(embeddings, superheroes)
-		// embeddings = append(embeddings, villains)
+	embeddings := [][]float64{
+		a, // red
+		b, // green
+		c, // blue
 	}
 
+	// These values were chosen after some experimentation, which
+	// is required to get good results depending on the data.
 	var (
-		perplexity   float64 = 300
-		learningRate float64 = 0.5
-		nIter        int     = 5
-		outputDims   int     = 10
-
-		// perplexity   float64 = 300
-		// learningRate float64 = 0.5
-		// nIter        int     = 2
-		// outputDims   int     = 2
-
-		// perplexity   float64 = 120
-		// learningRate float64 = 0.2
-		// nIter        int     = 2
-		// outputDims   int     = 2
-
-		// perplexity   float64 = 300
-		// learningRate float64 = 100
-		// nIter        int     = 2
-		// outputDims   int     = 2
+		perplexity       float64 = 200
+		nIter            int     = 20
+		outputDimensions int     = 2 // 2D or 3D space (2 or 3)
 	)
 
-	tSNEembeddings := TSNE(embeddings, perplexity, learningRate, nIter, outputDims)
+	tSNEDimensions := TSNE(embeddings, perplexity, nIter, outputDimensions)
 
-	img, err := Visualize(tSNEembeddings, 5, 512, 512)
+	for i, dimension := range tSNEDimensions {
+		t.Logf("embedding %d dimensions: %-2.f, %-2.f", i, dimension[0], dimension[1])
+	}
+
+	// We should see close red and green dots, and further away blue dots.
+	img, err := Visualize(tSNEDimensions, 5, 800, 800)
 	if err != nil {
 		t.Fatalf("failed to visualize embeddings: %v", err)
 	}
