@@ -573,3 +573,13 @@ func RuzickaDistance(a, b []float64) (float64, error) {
 
 	return distance, nil
 }
+
+// Sum returns the sum of elements in a given slice of float64
+func Sum(slice []float64) float64 {
+	sum := 0.0
+	for _, value := range slice {
+		sum += value
+	}
+	return sum
+}
+
