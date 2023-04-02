@@ -554,3 +554,22 @@ func ChebyshevDistance(a, b []float64) (float64, error) {
 
 	return distance, nil
 }
+
+// RuzickaDistance calculates the Ruzicka distance (or weighted Jaccard distance)
+// between two embeddings. It is a metric defined on a vector space where the
+// distance between two vectors is the sum of the minimum of their values along
+// any coordinate dimension.
+//
+// https://en.wikipedia.org/wiki/Jaccard_index
+func RuzickaDistance(a, b []float64) (float64, error) {
+	if len(a) != len(b) {
+		return 0, errors.New("embeddings must have equal lengths")
+	}
+
+	var distance float64
+	for i := 0; i < len(a); i++ {
+		distance += math.Min(a[i], b[i])
+	}
+
+	return distance, nil
+}
