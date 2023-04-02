@@ -1555,3 +1555,10 @@ func TestWordMoversDistance(t *testing.T) {
 
 	// Note: this doesn't seem to be useful for continuous embeddings.
 }
+
+func TestBhattacharyyaDistance(t *testing.T) {
+	// TODO: add tests
+
+	// Note: this doesn't seem to be useful for continuous embeddings.
+}
+

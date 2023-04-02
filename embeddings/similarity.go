@@ -309,3 +309,25 @@ func WordMoversDistance(a, b []float64, distanceFn func(a, b []float64) (float64
 
 	return sum, nil
 }
+
+// BhattacharyyaDistance calculates the Bhattacharyya distance between two
+// embeddings. This similarity measure is used to compare two probability
+// distributions represented by continuous embeddings. Lower values indicate
+// higher similarity between the distributions.
+//
+// Ends up not being very useful for OpenAI's embeddings.
+//
+// https://en.wikipedia.org/wiki/Bhattacharyya_distance
+func BhattacharyyaDistance(a, b []float64) (float64, error) {
+	if len(a) != len(b) {
+		return 0, errors.New("embeddings must have equal lengths")
+	}
+
+	var sum float64
+	for i := 0; i < len(a); i++ {
+		sum += math.Sqrt(a[i] * b[i])
+	}
+
+	return -math.Log(sum), nil
+}
+
