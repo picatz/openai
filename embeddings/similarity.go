@@ -277,3 +277,35 @@ func MahalanobisDistance(a, b []float64, covarianceMatrix [][]float64) (float64,
 
 	return math.Sqrt(sum), nil
 }
+
+// WordMoversDistance calculates the Word Mover's distance between two
+// embeddings. It calculates the minimum cumulative distance that the words in
+// one embedding need to travel to match the words in the other embedding.
+//
+// This is primarily used for text embeddings, but it can be used for any
+// embedding where the distance between two embeddings is the distance between
+// the words in the embeddings.
+//
+// https://en.wikipedia.org/wiki/Word_Mover%27s_Distance
+func WordMoversDistance(a, b []float64, distanceFn func(a, b []float64) (float64, error)) (float64, error) {
+	if len(a) != len(b) {
+		return 0, errors.New("embeddings must have equal lengths")
+	}
+
+	var sum float64
+	for i := 0; i < len(a); i++ {
+		min := math.Inf(1)
+		for j := 0; j < len(b); j++ {
+			d, err := distanceFn(a[i:], b[j:])
+			if err != nil {
+				return 0, err
+			}
+			if d < min {
+				min = d
+			}
+		}
+		sum += min
+	}
+
+	return sum, nil
+}

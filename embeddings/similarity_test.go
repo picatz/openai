@@ -1549,3 +1549,9 @@ func TestMahalanobisDistance(t *testing.T) {
 		}
 	})
 }
+
+func TestWordMoversDistance(t *testing.T) {
+	// TODO: add tests
+
+	// Note: this doesn't seem to be useful for continuous embeddings.
+}
