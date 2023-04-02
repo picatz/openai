@@ -498,8 +498,6 @@ func CorrelationDistance(a, b []float64) (float64, error) {
 // PairwiseDistance calculates the pairwise distance between two embeddings.
 // This is a measure of the distance between two vectors, and is useful for
 // comparing embeddings that represent directions.
-//
-// https://en.wikipedia.org/wiki/Distance
 func PairwiseDistance(a, b []float64) (float64, error) {
 	if len(a) != len(b) {
 		return 0, errors.New("embeddings must have equal lengths")
