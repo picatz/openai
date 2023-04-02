@@ -111,52 +111,96 @@ func computeJointProbability(data [][]float64, perp float64) [][]float64 {
 // proposed the t-distributed variant.
 //
 // https://en.wikipedia.org/wiki/T-distributed_stochastic_neighbor_embedding
-func TSNE(data [][]float64, perp float64, iter int, dim int) [][]float64 {
-	dataSize := len(data)
-	solution := make([][]float64, dataSize)
+func TSNE(embeddings [][]float64, perp float64, iter int, dim int) [][]float64 {
+	// Seed the random number generator with the current time.
+	//
+	// This is useful for t-SNE because it uses random numbers to
+	// initialize the solution vector.
+	rand.Seed(time.Now().UnixNano())
+
+	// Initialize the solution vector, and get embeddings size (outer dimension).
+	var (
+		embeddingsSize = len(embeddings)
+		solution       = make([][]float64, embeddingsSize)
+	)
+
+	// Initialize the solution vector of the given dimension.
 	for i := range solution {
 		solution[i] = make([]float64, dim)
 	}
-	rand.Seed(time.Now().UnixNano())
 
-	for i := 0; i < dataSize; i++ {
+	// Initialize the solution vector with random numbers.
+	for i := 0; i < embeddingsSize; i++ {
 		for j := 0; j < dim; j++ {
 			solution[i][j] = rand.Float64()
 		}
 	}
 
-	P := computeJointProbability(data, perp)
+	// Compute the joint probability distribution of the given embeddings.
+	P := computeJointProbability(embeddings, perp)
 
+	// Run the optimization loop for the given number of iterations.
+	//
+	// This performs gradient descent on the solution vector, using
+	// the joint probability distribution as the target.
 	for t := 1; t <= iter; t++ {
+		// Compute the gradient of the solution vector.
 		var grad [][]float64
-		for i := 0; i < dataSize; i++ {
 
+		// Compute the gradient for each embedding.
+		for i := 0; i < embeddingsSize; i++ {
+			// Compute the gradient for each dimension.
 			gradY := make([]float64, dim)
 
+			// Compute the sum of the joint probability distribution.
 			for k := 0; k < dim; k++ {
+				// The sum of the joint probability distribution (Q) is
+				// computed by summing the squared Euclidean distance
+				// between each embedding.
 				var sumQi float64
-				for j := 0; j < dataSize; j++ {
+
+				// Compute the sum of the joint probability distribution.
+				for j := 0; j < embeddingsSize; j++ {
+					// Skip the current embedding.
 					if i == j {
 						continue
 					}
-					Qij := 1 / (1 + squaredEuclidean(data[i], data[j]))
+
+					// Compute the squared Euclidean distance between the embeddings.
+					Qij := 1 / (1 + squaredEuclidean(embeddings[i], embeddings[j]))
+
+					// Add the squared Euclidean distance to the sum.
 					sumQi += Qij
 				}
 
-				for j := 0; j < dataSize; j++ {
+				// Compute the gradient for the given dimension.
+				for j := 0; j < embeddingsSize; j++ {
+					// Skip the current embedding.
 					if i == j {
 						continue
 					}
-					f := ((P[i][j] - sumQi) * squaredEuclidean(data[i], data[j]))
+
+					// Compute the gradient for the given dimension using the
+					// joint probability distribution (P) and the sum of the
+					// joint probability distribution (Q) which is computed
+					// above.
+					f := ((P[i][j] - sumQi) * squaredEuclidean(embeddings[i], embeddings[j]))
+
+					// Add the gradient to the gradient vector.
 					gradY[k] += f * (solution[i][k] - solution[j][k])
 				}
 			}
 
+			// Append the computed gradient.
 			grad = append(grad, gradY)
 		}
 
+		// Update the solution vector, using the gradient at the given learning rate.
+		//
+		// The learning rate is decreased over time, to prevent the solution vector
+		// from oscillating too much, allowing it to settle into a stable state.
 		learningRate := 500 / float64(t)
-		for i := 0; i < dataSize; i++ {
+		for i := 0; i < embeddingsSize; i++ {
 			for k := 0; k < dim; k++ {
 				solution[i][k] -= learningRate * grad[i][k]
 			}
