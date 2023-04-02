@@ -2271,3 +2271,7 @@ func TestHellingerDistance(t *testing.T) {
 
 	// Note: this doesn't seem to be useful for continuous embeddings?
 }
+
+func TestTanimotoDistance(t *testing.T) {
+	// TODO: add tests?
+}

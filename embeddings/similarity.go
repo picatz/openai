@@ -529,3 +529,10 @@ func HellingerDistance(p, q []float64) (float64, error) {
 
 	return math.Sqrt(distance) / math.Sqrt2, nil
 }
+
+// TanimotoDistance calculates the Tanimoto distance between two embeddings.
+//
+// https://en.wikipedia.org/wiki/Jaccard_index
+func TanimotoDistance(a, b []float64) (float64, error) {
+	return JaquardSimilarity(a, b)
+}
