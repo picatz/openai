@@ -583,3 +583,26 @@ func Sum(slice []float64) float64 {
 	return sum
 }
 
+// WaveHedgesDistance compares two embeddings and returns the distance between them.
+func WaveHedgesDistance(a, b []float64) (float64, error) {
+	// Check if the lengths of the input vectors are equal
+	if len(a) != len(b) {
+		return 0, fmt.Errorf("input vectors should have the same length")
+	}
+
+	distance := 0.0
+	for i := 0; i < len(a); i++ {
+		// Calculate the difference between the two vector components
+		diff := a[i] - b[i]
+
+		// Calculate the absolute value of the difference and add
+		// it to the overall distance.
+		distance += math.Abs(diff)
+	}
+
+	// Calculate the Wave Hedges Distance by dividing the overall distance by
+	// the sum of components in the input vectors
+	waveHedgesDistance := distance / Sum(a)
+
+	return waveHedgesDistance, nil
+}
