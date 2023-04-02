@@ -657,3 +657,26 @@ func MotykaSimpsonDistance(a, b []float64) (float64, error) {
 	return motykaSimpsonDistance, nil
 }
 
+// LorentzianDistance compares two embeddings and returns the distance between them.
+func LorentzianDistance(a, b []float64) (float64, error) {
+	// Check if the lengths of the input vectors are equal
+	if len(a) != len(b) {
+		return 0, fmt.Errorf("input vectors should have the same length")
+	}
+
+	distance := 0.0
+	for i := 0; i < len(a)-1; i++ {
+		// Calculate the difference between the two vector components
+		diff := a[i] - b[i]
+
+		// Calculate the absolute value of the difference and add
+		// it to the overall distance.
+		distance += math.Abs(diff)
+	}
+
+	// Calculate the Lorentzian Distance by dividing the overall distance by
+	// the sum of components in the input vectors
+	lorentzianDistance := distance - math.Abs(a[len(a)-1]-b[len(b)-1])
+
+	return lorentzianDistance, nil
+}
