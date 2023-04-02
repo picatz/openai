@@ -510,3 +510,22 @@ func PairwiseDistance(a, b []float64) (float64, error) {
 
 	return math.Sqrt(distance), nil
 }
+
+// HellingerDistance calculates the Hellinger distance between two embeddings.
+// This is a measure of the distance between two probability distributions
+// represented by continuous embeddings. Lower values indicate higher similarity
+// between the distributions.
+//
+// https://en.wikipedia.org/wiki/Hellinger_distance
+func HellingerDistance(p, q []float64) (float64, error) {
+	if len(p) != len(q) {
+		return 0, errors.New("distributions must have the same dimensions")
+	}
+
+	var distance float64
+	for i := 0; i < len(p); i++ {
+		distance += math.Pow(math.Sqrt(p[i])-math.Sqrt(q[i]), 2)
+	}
+
+	return math.Sqrt(distance) / math.Sqrt2, nil
+}

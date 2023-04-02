@@ -2265,3 +2265,9 @@ func TestPairwiseDistance(t *testing.T) {
 		}
 	})
 }
+
+func TestHellingerDistance(t *testing.T) {
+	// TODO: add tests
+
+	// Note: this doesn't seem to be useful for continuous embeddings?
+}
