@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sort"
 )
 
 // CosineSimilarity calculates the cosine similarity between two embeddings.
@@ -331,3 +332,33 @@ func BhattacharyyaDistance(a, b []float64) (float64, error) {
 	return -math.Log(sum), nil
 }
 
+// WassersteinDistance calculates the Wasserstein distance between two
+// embeddings. Also known as the Earth Mover's distance, this measures
+// the minimum amount of work required to transform one distribution
+// into another, considering the distance between each data point. It
+// can be used to compare probability distributions represented by
+// continuous embeddings.
+//
+// https://en.wikipedia.org/wiki/Wasserstein_metric
+func WassersteinDistance(a, b []float64) (float64, error) {
+	if len(a) != len(b) {
+		return 0, errors.New("embeddings must have equal lengths")
+	}
+
+	// Avoid modifying the original embeddings, since we need to sort them.
+	sortedA := make([]float64, len(a))
+	sortedB := make([]float64, len(b))
+
+	copy(sortedA, a)
+	copy(sortedB, b)
+
+	sort.Float64s(sortedA)
+	sort.Float64s(sortedB)
+
+	distance := 0.0
+	for i := range sortedA {
+		distance += math.Abs(sortedA[i] - sortedB[i])
+	}
+
+	return distance, nil
+}
