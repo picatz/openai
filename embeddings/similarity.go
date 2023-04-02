@@ -454,3 +454,23 @@ func JensenShannonDivergence(p, q []float64) (float64, error) {
 
 	return 0.5 * (dPm + dQm), nil
 }
+
+// AngularDistance calculates the angular distance between two embeddings.
+// This is a measure of the angle between two vectors, and is useful for
+// comparing embeddings that represent directions.
+//
+// https://en.wikipedia.org/wiki/Angular_distance
+func AngularDistance(a, b []float64) (float64, error) {
+	if len(a) != len(b) {
+		return 0, errors.New("embeddings must have equal lengths")
+	}
+
+	var dot, normA, normB float64
+	for i := 0; i < len(a); i++ {
+		dot += a[i] * b[i]
+		normA += a[i] * a[i]
+		normB += b[i] * b[i]
+	}
+
+	return math.Acos(dot / (math.Sqrt(normA) * math.Sqrt(normB))), nil
+}
