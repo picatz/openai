@@ -155,6 +155,10 @@ const (
 
 	// https://platform.openai.com/docs/guides/embeddings/embedding-models
 	ModelTextEmbeddingAda001 Model = "text-embedding-ada-001"
+
+	// This is the recommend model for nearly all embedding use cases.
+	//
+	// https://openai.com/blog/new-and-improved-embedding-model
 	ModelTextEmbeddingAda002 Model = "text-embedding-ada-002"
 
 	// https://platform.openai.com/docs/api-reference/chat/create#chat/create-model
