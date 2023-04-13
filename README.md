@@ -2,9 +2,15 @@
  
 An unofficial community-maintained Go client package and CLI for OpenAI's API.
 
+## Installation
+
+To use this package, you must have a valid OpenAI API key. You can get one [here](https://platform.openai.com/).
+
 ```console
-$ go get -v github.com/picatz/openai
+$ go get github.com/picatz/openai@latest
 ```
+
+## Usage
 
 ```go
 import "github.com/picatz/openai"
@@ -15,13 +21,12 @@ client := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
 ```go
 resp, _ := client.CreateCompletion(ctx, &openai.CreateComletionRequest{
 	Model:     openai.ModelDavinci,
-	Prompt:    []string{"This is a test"},
+	Prompt:    []string{"Once upon a time"},
 	MaxTokens: 5,
 })
 
-for _, choice := range resp.Choices {
-    fmt.Println(choice.Text)
-}
+fmt.Println(resp.Choices[0].Text)
+// Once upon a time ...max of 5 tokens...
 ```
 
 ```go
@@ -31,9 +36,8 @@ resp, _ := client.CreateEdit(ctx, &openai.CreateEditRequest{
 	Input:       "This is a test",
 })
 
-for _, choice := range resp.Choices {
-    fmt.Println(choice.Index, choice.Text)
-}
+fmt.Println(resp.Choices[0].Text)
+// This is an example
 ```
 
 ```go
@@ -45,20 +49,31 @@ resp, _ := client.CreateImage(ctx, &openai.CreateImageRequest{
 })
 
 fmt.Println(*resp.Data[0].URL)
+// https://...
 ```
 
 ```go
+var history []openai.ChatMessage{
+	{
+		Role:    openai.ChatRoleSystem,
+		Content: "You are a helpful assistant for this example.",
+	},
+	{
+		Role:    openai.ChatRoleUser,
+		Content: "Hello!", // Get input from user.
+	},
+}
+
 resp, _ := client.CreateChat(ctx, &openai.CreateChatRequest{
 	Model: openai.ModelGPT35Turbo,
-	Messages: []openai.ChatMessage{
-		{
-			Role:    openai.ChatRoleUser,
-			Content: "Hello!", // Put user content here...
-		},
-	},
+	Messages: history,
 })
 
 fmt.Println(resp.Choices[0].Message.Content)
+// Hello how may I help you today?
+
+// Update history, summarize, forget, etc. Then repeat.
+history = appened(history, resp.Choices[0].Message)
 ```
 
 ### `openai` CLI
