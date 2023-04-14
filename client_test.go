@@ -147,6 +147,31 @@ func TestCreateChat(t *testing.T) {
 	t.Logf("bot: %q", strings.TrimSpace(resp.Choices[0].Message.Content))
 }
 
+func TestCreateAudioTranscription(t *testing.T) {
+	c := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
+
+	ctx := testCtx(t)
+
+	fh, err := os.Open("testdata/hello-world.m4a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fh.Close()
+
+	resp, err := c.CreateAudioTranscription(ctx, &openai.CreateAudioTranscriptionRequest{
+		Model: openai.ModelWhisper1,
+		File:  fh,
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if resp.Text() != "Hello world, from an audio file." {
+		t.Fatalf("expected 'Hello world, from an audio file.', got %q", resp.Text())
+	}
+}
+
 func ExampleClient_CreateCompletion() {
 	c := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
 

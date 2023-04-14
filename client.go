@@ -8,6 +8,8 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"os"
+	"strconv"
 )
 
 // Client is a client for the OpenAI API.
@@ -1652,6 +1654,202 @@ func (c *Client) CreateChat(ctx context.Context, req *CreateChatRequest) (*Creat
 	}
 
 	return &res, nil
+}
+
+type AudioTranscriptableFile interface {
+	io.ReadCloser
+	Name() string
+}
+
+type AudioTranscriptionFileReadCloser struct {
+	io.ReadCloser
+	name string // Example: "audio.mp3"
+}
+
+func (a *AudioTranscriptionFileReadCloser) Name() string {
+	return a.name
+}
+
+func NewAudioTranscriptableFileFromReadCloser(rc io.ReadCloser, name string) AudioTranscriptableFile {
+	return &AudioTranscriptionFileReadCloser{
+		ReadCloser: rc,
+		name:       name,
+	}
+}
+
+// AudioTranscriptionFile is a file to be used in a CreateAudioTranscriptionRequest,
+// allowing a caller to provide various types of file types.
+//
+// Only provide one of the fields in this struct.
+//
+// https://platform.openai.com/docs/api-reference/audio/create#audio/create-file
+type AudioTranscriptionFile struct {
+	ReadCloser *AudioTranscriptionFileReadCloser
+
+	File *os.File
+}
+
+// https://platform.openai.com/docs/api-reference/audio/create
+type CreateAudioTranscriptionRequest struct {
+	// https://platform.openai.com/docs/api-reference/audio/create#audio/create-file
+	//
+	// Required.
+	File AudioTranscriptableFile
+
+	// https://platform.openai.com/docs/api-reference/audio/create#audio/create-model
+	//
+	// Required.
+	Model string
+
+	// https://platform.openai.com/docs/api-reference/audio/create#audio/create-prompt
+	//
+	// Optional.
+	Prompt string
+
+	// The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt.
+	//
+	// https://platform.openai.com/docs/api-reference/audio/create#audio/create-response_format
+	//
+	// Optional. Defaults to "json".
+	ResponseFormat string
+
+	// https://platform.openai.com/docs/api-reference/audio/create#audio/create-temperature
+	//
+	// Optional.
+	Temperature float64
+
+	// https://platform.openai.com/docs/api-reference/audio/create#audio/create-language
+	//
+	// Optional.
+	Language string
+}
+
+// responseFormat returns the intended response format of the transcription.
+func (req *CreateAudioTranscriptionRequest) responseFormat() string {
+	if req.ResponseFormat == "" {
+		return "json"
+	}
+	return req.ResponseFormat
+}
+
+// https://platform.openai.com/docs/api-reference/audio/create
+type CreateAudioTranscriptionResponse interface {
+	Text() string
+}
+
+// https://platform.openai.com/docs/api-reference/audio/create
+type CreateAudioTranscriptionResponseJSON struct {
+	RawText string `json:"text"`
+}
+
+// https://platform.openai.com/docs/api-reference/audio/create
+func (a *CreateAudioTranscriptionResponseJSON) Text() string {
+	return a.RawText
+}
+
+// CreateAudioTranscription transcribes audio into the input language.
+//
+// https://platform.openai.com/docs/api-reference/audio/create
+func (c *Client) CreateAudioTranscription(ctx context.Context, req *CreateAudioTranscriptionRequest) (CreateAudioTranscriptionResponse, error) {
+	b := new(bytes.Buffer)
+	w := multipart.NewWriter(b)
+
+	// Write the file
+	fw, err := w.CreateFormFile("file", req.File.Name())
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := io.Copy(fw, req.File); err != nil {
+		return nil, err
+	}
+
+	// Write the model
+	if err := w.WriteField("model", req.Model); err != nil {
+		return nil, err
+	}
+
+	// Write the prompt
+	if req.Prompt != "" {
+		if err := w.WriteField("prompt", req.Prompt); err != nil {
+			return nil, err
+		}
+	}
+
+	// Write the response_format
+	if req.ResponseFormat != "" {
+		if err := w.WriteField("response_format", req.ResponseFormat); err != nil {
+			return nil, err
+		}
+	}
+
+	// Write the temperature
+	if req.Temperature != 0 {
+		if err := w.WriteField("temperature", strconv.FormatFloat(req.Temperature, 'f', -1, 64)); err != nil {
+			return nil, err
+		}
+	}
+
+	// Write the language
+	if req.Language != "" {
+		if err := w.WriteField("language", req.Language); err != nil {
+			return nil, err
+		}
+	}
+
+	// Close the writer
+	if err := w.Close(); err != nil {
+		return nil, err
+	}
+
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/audio/transcriptions", b)
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Set("Content-Type", w.FormDataContentType())
+
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+
+	var res CreateAudioTranscriptionResponse
+
+	switch req.responseFormat() {
+	case "json":
+		res = &CreateAudioTranscriptionResponseJSON{}
+
+		err := json.NewDecoder(resp.Body).Decode(res)
+		if err != nil {
+			return nil, err
+		}
+	// TODO: support other response formats
+	// case "text":
+	// 	res = &CreateAudioTranscriptionResponseText{}
+	// case "srt":
+	// 	res = &AudioTranscriptionResponseSRT{}
+	// case "verbose_json":
+	// 	res = &AudioTranscriptionResponseVerboseJSON{}
+	// case "vtt":
+	// 	res = &AudioTranscriptionResponseVTT{}
+	default:
+		return nil, fmt.Errorf("unknown response format: %s", req.ResponseFormat)
+	}
+
+	return res, nil
 }
 
 // TODO:

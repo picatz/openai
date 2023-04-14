@@ -170,5 +170,7 @@ const (
 	ModelGPT432K     = "gpt-4-32k"
 	ModelGPT432K0314 = "gpt-4-32k-0314"
 
+	ModelWhisper1 = "whisper-1"
+
 	// TODO: add more "known" models.
 )
