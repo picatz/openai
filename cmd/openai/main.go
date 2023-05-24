@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -12,6 +13,22 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/picatz/openai"
 )
+
+// TODO: make cross platform, macos only for now
+func readClipboard() (string, error) {
+	cmd := exec.Command("pbpaste")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
+// func writeClipboard(s string) error {
+// 	cmd := exec.Command("pbcopy")
+// 	cmd.Stdin = strings.NewReader(s)
+// 	return cmd.Run()
+// }
 
 // Small command-line utility to use the OpenAI API. It requires
 // an API key to be set in the OPENAI_API_KEY environment variable.
@@ -204,6 +221,19 @@ func startChat(client *openai.Client, model string) {
 			continue
 		}
 
+		// Check if the message has any <clipboard> tags.
+		if strings.Contains(input, "<clipboard>") {
+			// Get the clipboard contents.
+			str, err := readClipboard()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "%s", err)
+				os.Exit(1)
+			}
+
+			// Replace the <clipboard> tag with the clipboard contents.
+			input = strings.Replace(input, "<clipboard>", str, -1)
+		}
+
 		// Add the system message to the messages if the input starts with "system:".
 		//
 		// Note, you wouldn't want to do this if didn't trust the user. But, it's a nice
@@ -235,7 +265,7 @@ func startChat(client *openai.Client, model string) {
 		}
 
 		// Print the output using markdown-friendly terminal rendering.
-		s, err := glamour.Render(resp.Choices[0].Message.Content, "dark")
+		s, err := renderMarkdown(resp.Choices[0].Message.Content)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s", err)
 			os.Exit(1)
@@ -277,6 +307,26 @@ func startChat(client *openai.Client, model string) {
 			tokens = summaryTokens
 		}
 	}
+}
+
+func renderMarkdown(s string) (string, error) {
+	r, err := glamour.NewTermRenderer(
+		glamour.WithStylePath("dark"),
+		glamour.WithWordWrap(80),
+		glamour.WithPreservedNewLines(),
+	)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s", err)
+		os.Exit(1)
+	}
+
+	out, err := r.Render(s)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s", err)
+		os.Exit(1)
+	}
+
+	return out, nil
 }
 
 func chatRequest(client *openai.Client, model string, messages []openai.ChatMessage) (*openai.CreateChatResponse, error) {
