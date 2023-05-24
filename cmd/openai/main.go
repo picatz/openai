@@ -24,11 +24,11 @@ func readClipboard() (string, error) {
 	return string(out), nil
 }
 
-// func writeClipboard(s string) error {
-// 	cmd := exec.Command("pbcopy")
-// 	cmd.Stdin = strings.NewReader(s)
-// 	return cmd.Run()
-// }
+func writeClipboard(s string) error {
+	cmd := exec.Command("pbcopy")
+	cmd.Stdin = strings.NewReader(s)
+	return cmd.Run()
+}
 
 // Small command-line utility to use the OpenAI API. It requires
 // an API key to be set in the OPENAI_API_KEY environment variable.
@@ -217,6 +217,19 @@ func startChat(client *openai.Client, model string) {
 			// Remove the last message.
 			if len(messages) > 0 {
 				messages = messages[:len(messages)-1]
+			}
+			continue
+		}
+
+		if strings.TrimSpace(input) == "copy" {
+			// Copy the last message to the clipboard.
+			if len(messages) > 0 {
+				// Write the last message to the clipboard.
+				err := writeClipboard(messages[len(messages)-1].Content)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "%s", err)
+					os.Exit(1)
+				}
 			}
 			continue
 		}
