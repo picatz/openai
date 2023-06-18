@@ -1610,6 +1610,33 @@ type JSONSchema struct {
 
 	// Default is the default of the schema.
 	Default any `json:"default,omitempty"`
+
+	// Pattern is the pattern of the schema.
+	Pattern string `json:"pattern,omitempty"`
+
+	// MinItems is the minItems of the schema.
+	MinItems int `json:"minItems,omitempty"`
+
+	// MaxItems is the maxItems of the schema.
+	MaxItems int `json:"maxItems,omitempty"`
+
+	// UniqueItems is the uniqueItems of the schema.
+	UniqueItems bool `json:"uniqueItems,omitempty"`
+
+	// MultipleOf is the multipleOf of the schema.
+	MultipleOf int `json:"multipleOf,omitempty"`
+
+	// Min is the minimum of the schema.
+	Min int `json:"min,omitempty"`
+
+	// Max is the maximum of the schema.
+	Max int `json:"max,omitempty"`
+
+	// ExclusiveMin is the exclusiveMinimum of the schema.
+	ExclusiveMin bool `json:"exclusiveMinimum,omitempty"`
+
+	// ExclusiveMax is the exclusiveMaximum of the schema.
+	ExclusiveMax bool `json:"exclusiveMaximum,omitempty"`
 }
 
 type ChatMessage struct {
