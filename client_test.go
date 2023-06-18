@@ -2,6 +2,7 @@ package openai_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -145,6 +146,112 @@ func TestCreateChat(t *testing.T) {
 	t.Logf("user: %q", userMessage)
 
 	t.Logf("bot: %q", strings.TrimSpace(resp.Choices[0].Message.Content))
+}
+
+func TestMessageJSONUnmarshal(t *testing.T) {
+	data := `
+	{
+        "role": "assistant",
+        "content": null,
+        "function_call": {
+          "name": "getCurrentLocation",
+          "arguments": "{\n  \"location\": \"Ann Arbor, MI\",\n  \"unit\": \"celsius\"\n}"
+        }
+    }
+	`
+
+	var msg openai.ChatMessage
+
+	err := json.Unmarshal([]byte(data), &msg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("msg: %#+v", msg.FunctionCall.Arguments)
+
+	args := msg.FunctionCall.Arguments
+
+	locationArg, err := openai.GetTypedFunctionCallArgumentValue[string]("location", args)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	unitArg, err := openai.GetTypedFunctionCallArgumentValue[string]("unit", args)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("location: %[1]T(%[1]q)", locationArg)
+	t.Logf("unit: %[1]T(%[1]q)", unitArg)
+}
+
+func TestCreateChat_FunctionCall(t *testing.T) {
+	c := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
+
+	ctx := testCtx(t)
+
+	// https://platform.openai.com/docs/guides/gpt/function-calling
+	getCurrentWeather := func(location string, unit string) string {
+		return fmt.Sprintf("The current temperature in %s is 72 degrees %s.", location, unit)
+	}
+
+	resp, err := c.CreateChat(ctx, &openai.CreateChatRequest{
+		Model: openai.ModelGPT35Turbo0613,
+		Messages: []openai.ChatMessage{
+			{
+				Role:    "user",
+				Content: "What's the weather like in Ann Arbor?",
+			},
+		},
+		Functions: []*openai.Function{
+			{
+				Name:        "getCurrentWeather",
+				Description: "Gets the current weather in a location from the given location and unit.",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"location": map[string]any{
+							"type":        "string",
+							"description": "The city and state, e.g. San Francisco, CA",
+						},
+						"unit": map[string]any{
+							"type": "string",
+							"enum": []string{"fahrenheit", "celsius"},
+						},
+					},
+					"required": []string{"location", "unit"},
+				},
+			},
+		},
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(resp.Choices) == 0 {
+		t.Fatal("expected at least one choice")
+	}
+
+	if resp.Choices[0].Message.FunctionCall == nil {
+		t.Fatal("expected function to be non-nil")
+	}
+
+	args := resp.Choices[0].Message.FunctionCall.Arguments
+
+	locationArg, err := openai.GetTypedFunctionCallArgumentValue[string]("location", args)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	unitArg, err := openai.GetTypedFunctionCallArgumentValue[string]("unit", args)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	currentWeather := getCurrentWeather(locationArg, unitArg)
+
+	t.Logf("currentWeather: %q", currentWeather)
 }
 
 func TestCreateAudioTranscription(t *testing.T) {
