@@ -68,6 +68,26 @@ func NewClient(apiKey string, opts ...ClientOption) *Client {
 	return c
 }
 
+// Role is the role of the user for a chat message.
+type Role = string
+
+const (
+	// RoleSystem is a special used to ground the model within the context of the conversation.
+	//
+	// For example, it may be used to provide a name for the assistant, or to provide other global information
+	// or instructions that the model should know about.
+	RoleSystem Role = "system"
+
+	// RoleUser is the role of the user for a chat message.
+	RoleUser Role = "user"
+
+	// RoleAssistant is the role of the assistant for a chat message.
+	RoleAssistant Role = "assistant"
+
+	// RoleFunction is a special role used to represent a function call.
+	RoleFunction Role = "function"
+)
+
 // CreateCompletionRequest contains information for a "completion" request
 // to the OpenAI API. This is the fundamental request type for the API.
 //
