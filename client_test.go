@@ -208,19 +208,19 @@ func TestCreateChat_FunctionCall(t *testing.T) {
 			{
 				Name:        "getCurrentWeather",
 				Description: "Gets the current weather in a location from the given location and unit.",
-				Parameters: map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"location": map[string]any{
-							"type":        "string",
-							"description": "The city and state, e.g. San Francisco, CA",
+				Parameters: &openai.JSONSchema{
+					Type: "object",
+					Properties: map[string]*openai.JSONSchema{
+						"location": {
+							Type:        "string",
+							Description: "The city and state, e.g. San Francisco, CA",
 						},
-						"unit": map[string]any{
-							"type": "string",
-							"enum": []string{"fahrenheit", "celsius"},
+						"unit": {
+							Type: "string",
+							Enum: []string{"fahrenheit", "celsius"},
 						},
 					},
-					"required": []string{"location", "unit"},
+					Required: []string{"location", "unit"},
 				},
 			},
 		},

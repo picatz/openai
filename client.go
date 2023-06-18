@@ -1566,7 +1566,50 @@ type Function struct {
 	// https://platform.openai.com/docs/guides/gpt/function-calling
 	//
 	// https://platform.openai.com/docs/api-reference/chat/create#chat/create-parameters
-	Parameters any `json:"parameters,omitempty"`
+	//
+	// Required.
+	Parameters *JSONSchema `json:"parameters,omitempty"`
+}
+
+// JSONSchema is a JSON Schema.
+//
+// https://json-schema.org/understanding-json-schema/reference/index.html
+type JSONSchema struct {
+	// Type is the type of the schema.
+	Type string `json:"type,omitempty"`
+
+	// Description is the description of the schema.
+	Description string `json:"description,omitempty"`
+
+	// Properties is the properties of the schema.
+	Properties map[string]*JSONSchema `json:"properties,omitempty"`
+
+	// Required is the required properties of the schema.
+	Required []string `json:"required,omitempty"`
+
+	// Enum is the enum of the schema.
+	Enum []string `json:"enum,omitempty"`
+
+	// Items is the items of the schema.
+	Items *JSONSchema `json:"items,omitempty"`
+
+	// AdditionalProperties is the additional properties of the schema.
+	AdditionalProperties *JSONSchema `json:"additionalProperties,omitempty"`
+
+	// Ref is the ref of the schema.
+	Ref string `json:"$ref,omitempty"`
+
+	// AnyOf is the anyOf of the schema.
+	AnyOf []*JSONSchema `json:"anyOf,omitempty"`
+
+	// AllOf is the allOf of the schema.
+	AllOf []*JSONSchema `json:"allOf,omitempty"`
+
+	// OneOf is the oneOf of the schema.
+	OneOf []*JSONSchema `json:"oneOf,omitempty"`
+
+	// Default is the default of the schema.
+	Default any `json:"default,omitempty"`
 }
 
 type ChatMessage struct {
