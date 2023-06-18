@@ -203,6 +203,7 @@ func TestCreateChat_FunctionCall(t *testing.T) {
 				Content: "What's the weather like in Ann Arbor?",
 			},
 		},
+		FunctionCall: openai.FunctionCallAuto,
 		Functions: []*openai.Function{
 			{
 				Name:        "getCurrentWeather",
@@ -235,6 +236,10 @@ func TestCreateChat_FunctionCall(t *testing.T) {
 
 	if resp.Choices[0].Message.FunctionCall == nil {
 		t.Fatal("expected function to be non-nil")
+	}
+
+	if resp.Choices[0].Message.FunctionCall.Name != "getCurrentWeather" {
+		t.Fatalf("expected function name to be %q, got %q", "getCurrentWeather", resp.Choices[0].Message.FunctionCall.Name)
 	}
 
 	args := resp.Choices[0].Message.FunctionCall.Arguments

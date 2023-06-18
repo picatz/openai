@@ -1603,6 +1603,59 @@ type ChatMessage struct {
 	FunctionCall *FunctionCall `json:"function_call,omitempty"`
 }
 
+// FunctionCallControl is an option used to control the behavior of a function call
+// in a chat request. It can be used to specify the name of the function to call,
+// "none", or "auto" (the default).
+//
+// https://platform.openai.com/docs/api-reference/chat/create#chat/create-function_call
+type FunctionCallControl interface {
+	isFunctionCallControl()
+}
+
+// FunctionCallControlNone is a function call option that indicates that no function
+// should be called.
+type FunctionCallControlNone struct{}
+
+func (FunctionCallControlNone) isFunctionCallControl() {}
+
+// MarhsalJSON marshals the function call option into a JSON string.
+func (FunctionCallControlNone) MarshalJSON() ([]byte, error) {
+	return json.Marshal("none")
+}
+
+// FunctionCallControlAuto is a function call option that indicates that the
+// function to call should be determined automatically.
+type FunctionCallControlAuto struct{}
+
+func (FunctionCallControlAuto) isFunctionCallControl() {}
+
+// MarhsalJSON marshals the function call option into a JSON string.
+func (FunctionCallControlAuto) MarshalJSON() ([]byte, error) {
+	return json.Marshal("auto")
+}
+
+// FunctionCallControlName is a function call option that indicates that the
+// function to call should be determined by the given name.
+type FunctionCallControlName string
+
+func (FunctionCallControlName) isFunctionCallControl() {}
+
+// MarhsalJSON marshals the function call option into a JSON string.
+func (f FunctionCallControlName) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]string{
+		"name": string(f),
+	})
+}
+
+var (
+	FunctionCallAuto = FunctionCallControlAuto{}
+	FunctionCallNone = FunctionCallControlNone{}
+)
+
+func FunctionCallName(name string) FunctionCallControlName {
+	return FunctionCallControlName(name)
+}
+
 // CreateChatRequest is sent to the API, which will return a chat response.
 //
 // This is the substrate for that OpenAI chat API, which can be used for
@@ -1629,14 +1682,14 @@ type CreateChatRequest struct {
 	// https://platform.openai.com/docs/api-reference/chat/create#chat/create-model
 	//
 	// Required.
-	Model string `json:"model"`
+	Model string `json:"model,omitempty"`
 
 	// The context window of the conversation, which is a list of messages.
 	//
 	// https://platform.openai.com/docs/api-reference/chat/create#chat/create-messages
 	//
 	// Required.
-	Messages []ChatMessage `json:"messages"`
+	Messages []ChatMessage `json:"messages,omitempty"`
 
 	// https://platform.openai.com/docs/api-reference/chat/create#chat/create-temperature
 	//
@@ -1731,6 +1784,18 @@ type CreateChatRequest struct {
 	//
 	// Optional.
 	Functions []*Function `json:"functions,omitempty"`
+
+	// Controls how the model responds to function calls. "none" means the model does not
+	// call a function, and responds to the end-user. "auto" means the model can pick
+	// between an end-user or calling a function. Specifying a particular function
+	// via {"name":\ "my_function"} forces the model to call that function. "none"
+	// is the default when no functions are present. "auto" is the default if
+	// functions are present.
+	//
+	// https://platform.openai.com/docs/api-reference/chat/create#chat/create-function_call
+	//
+	// Optional.
+	FunctionCall FunctionCallControl `json:"function_call,omitempty"`
 }
 
 // CreateChatResponse is recieved in response to a chat request.
