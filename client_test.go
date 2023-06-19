@@ -148,6 +148,48 @@ func TestCreateChat(t *testing.T) {
 	t.Logf("bot: %q", strings.TrimSpace(resp.Choices[0].Message.Content))
 }
 
+func TestCreateChat_Stream(t *testing.T) {
+	c := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
+
+	ctx := testCtx(t)
+
+	resp, err := c.CreateChat(ctx, &openai.CreateChatRequest{
+		Model: openai.ModelGPT35Turbo,
+		Messages: []openai.ChatMessage{
+			{
+				Role:    "user",
+				Content: "Hello!",
+			},
+		},
+		Stream: true,
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer resp.Stream.Close()
+
+	b := strings.Builder{}
+
+	err = resp.ReadStream(ctx, func(c *openai.ChatMessageStreamChunk) error {
+		if c.ContentDelta() {
+			contentChunk, err := c.FirstChoice()
+			if err != nil {
+				return err
+			}
+			b.WriteString(contentChunk)
+		}
+		return nil
+	})
+
+	t.Logf("bot: %q", strings.TrimSpace(b.String()))
+
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestMessageJSONUnmarshal(t *testing.T) {
 	data := `
 	{

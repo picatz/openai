@@ -1,11 +1,13 @@
 package openai
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -1889,6 +1891,139 @@ type CreateChatResponse struct {
 
 	// https://platform.openai.com/docs/api-reference/chat/create#chat/create-stream
 	Stream io.ReadCloser `json:"-"`
+}
+
+// FirstChoice returns the first choice in the response, or an error if there are no choices.
+func (r *CreateChatResponse) FirstChoice() (*ChatMessage, error) {
+	if len(r.Choices) == 0 {
+		return nil, fmt.Errorf("no choices returned")
+	}
+
+	return &r.Choices[0].Message, nil
+}
+
+// RandomChoice returns a random choice in the response, or an error if there are no choices.
+func (r *CreateChatResponse) RandomChoice() (*ChatMessage, error) {
+	if len(r.Choices) == 0 {
+		return nil, fmt.Errorf("no choices returned")
+	}
+
+	return &r.Choices[rand.Intn(len(r.Choices))].Message, nil
+}
+
+type ChatMessageStreamChunk struct {
+	ID      string `json:"id"`
+	Object  string `json:"object"`
+	Created int    `json:"created"`
+	Model   string `json:"model"`
+	Choices []struct {
+		// Delta is either for role or content.
+		Delta struct {
+			Role    *string `json:"role"`
+			Content *string `json:"content"`
+		} `json:"delta"`
+		Index        int `json:"index"`
+		FinishReason any `json:"finish_reason"`
+	} `json:"choices"`
+}
+
+// Content returns the content of the message, or an error if there are no choices.
+func (c *ChatMessageStreamChunk) ContentDelta() bool {
+	if c == nil {
+		return false
+	}
+
+	if len(c.Choices) == 0 {
+		return false
+	}
+
+	return c.Choices[0].Delta.Content != nil
+}
+
+// Content returns the content of the message, or an error if there are no choices.
+func (c *ChatMessageStreamChunk) FirstChoice() (string, error) {
+	if len(c.Choices) == 0 {
+		return "", fmt.Errorf("no choices returned")
+	}
+
+	// Check if the delta is for the role.
+	if c.Choices[0].Delta.Role != nil {
+		return "", fmt.Errorf("delta is for role, not content")
+	}
+
+	return *c.Choices[0].Delta.Content, nil
+}
+
+// ReadStream reads the stream, applying the callback to each message.
+//
+// Messages are sent via sever-sent events (SSE).
+func (r *CreateChatResponse) ReadStream(ctx context.Context, cb func(*ChatMessageStreamChunk) error) error {
+	if r.Stream == nil {
+		return fmt.Errorf("no stream")
+	}
+
+	// Close the stream when we're done.
+	defer r.Stream.Close()
+
+	s := bufio.NewScanner(r.Stream)
+
+	for s.Scan() && ctx.Err() == nil {
+		// Get the data from the line.
+		data := s.Bytes()
+
+		// Skip empty lines.
+		if len(data) == 0 {
+			continue
+		}
+
+		// Skip comments.
+		if data[0] == ':' {
+			continue
+		}
+
+		// Split the line into fields.
+		fields := bytes.SplitN(data, []byte{':'}, 2)
+
+		// Ensure there are two fields.
+		if len(fields) != 2 {
+			continue
+		}
+
+		// Ensure the first field is "data".
+		if !bytes.Equal(fields[0], []byte("data")) {
+			continue
+		}
+
+		// Check if data is [DONE].
+		if bytes.Equal(fields[1], []byte("[DONE]")) {
+			break
+		}
+
+		// Unmarshal the message.
+		var chunk ChatMessageStreamChunk
+
+		// Skip if we can't unmarshal.
+		if err := json.Unmarshal(fields[1], &chunk); err != nil {
+			continue
+		}
+
+		// Call the callback.
+		if err := cb(&chunk); err != nil {
+			return err
+		}
+	}
+
+	// Check for scanner errors.
+	if err := s.Err(); err != nil {
+		return err
+	}
+
+	// Check for context errors.
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
+	return nil
 }
 
 // CreateChat sends a chat request to the API to obtain a chat response,
