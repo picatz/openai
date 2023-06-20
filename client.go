@@ -2030,6 +2030,30 @@ func (r *CreateChatResponse) ReadStream(ctx context.Context, cb func(*ChatMessag
 // creating a completion for the included chat messages (the conversation
 // context and history).
 //
+// # Example
+//
+//	var history []openai.ChatMessage{
+//	 	{
+//	 		Role:    openai.ChatRoleSystem,
+//	 		Content: "You are a helpful assistant for this example.",
+//	 	},
+//	 	{
+//	 		Role:    openai.ChatRoleUser,
+//	 		Content: "Hello!", // Get input from user.
+//	  	},
+//	 }
+//
+//	resp, _ := client.CreateChat(ctx, &openai.CreateChatRequest{
+//		Model: openai.ModelGPT35Turbo,
+//		Messages: history,
+//	})
+//
+//	fmt.Println(resp.Choices[0].Message.Content)
+//	// Hello how may I help you today?
+//
+//	// Update history, summarize, forget, etc. Then repeat.
+//	history = appened(history, resp.Choices[0].Message)
+//
 // https://platform.openai.com/docs/api-reference/chat/create
 func (c *Client) CreateChat(ctx context.Context, req *CreateChatRequest) (*CreateChatResponse, error) {
 	b, err := json.Marshal(req)
