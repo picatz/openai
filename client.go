@@ -16,7 +16,7 @@ import (
 
 // Client is a client for the OpenAI API.
 //
-// https://beta.openai.com/docs/api-reference
+// https://platform.openai.com/docs/api-reference
 type Client struct {
 	// APIKey is the API key to use for requests.
 	APIKey string
@@ -45,7 +45,7 @@ func WithHTTPClient(c *http.Client) ClientOption {
 
 // WithOrganization is a ClientOption that sets the organization to use for requests.
 //
-// https://beta.openai.com/docs/api-reference/authentication
+// https://platform.openai.com/docs/api-reference/authentication
 func WithOrganization(org string) ClientOption {
 	return func(client *Client) {
 		client.Organization = org
@@ -93,11 +93,11 @@ const (
 // CreateCompletionRequest contains information for a "completion" request
 // to the OpenAI API. This is the fundamental request type for the API.
 //
-// https://beta.openai.com/docs/api-reference/completions/create
+// https://platform.openai.com/docs/api-reference/completions/create
 type CreateCompletionRequest struct {
 	// ID of the model to use. You can use the List models API to see all of your available models, or see our Model overview for descriptions of them.
 	//
-	// https://beta.openai.com/docs/api-reference/completions/create#completions/create-model
+	// https://platform.openai.com/docs/api-reference/completions/create#completions/create-model
 	Model string `json:"model"`
 
 	// The prompt(s) to generate completions for, encoded as a string, array of strings, array of tokens, or array of token arrays.
@@ -105,10 +105,10 @@ type CreateCompletionRequest struct {
 	// Note that <|endoftext|> is the document separator that the model sees during training, so if a prompt is not specified the model
 	// will generate as if from the beginning of a new document.
 	//
-	// https://beta.openai.com/docs/api-reference/completions/create#completions/create-prompt
+	// https://platform.openai.com/docs/api-reference/completions/create#completions/create-prompt
 	Prompt []string `json:"prompt"`
 
-	// https://beta.openai.com/docs/api-reference/completions/create#completions/create-suffix
+	// https://platform.openai.com/docs/api-reference/completions/create#completions/create-suffix
 	Suffix string `json:"suffix,omitempty"`
 
 	// The maximum number of tokens to generate in the completion.
@@ -118,53 +118,53 @@ type CreateCompletionRequest struct {
 	//
 	// Defaults to 16 if not specified.
 	//
-	// https://beta.openai.com/docs/api-reference/completions/create#completions/create-max_tokens
+	// https://platform.openai.com/docs/api-reference/completions/create#completions/create-max_tokens
 	MaxTokens int `json:"max_tokens,omitempty"`
 
-	// https://beta.openai.com/docs/api-reference/completions/create#completions/create-temperature
+	// https://platform.openai.com/docs/api-reference/completions/create#completions/create-temperature
 	//
 	// Defaults to 1 if not specified.
 	Temperature float64 `json:"temperature,omitempty"`
 
-	// https://beta.openai.com/docs/api-reference/completions/create#completions/create-top_p
+	// https://platform.openai.com/docs/api-reference/completions/create#completions/create-top_p
 	//
 	// Defaults to 1 if not specified.
 	TopP float64 `json:"top_p,omitempty"`
 
-	// https://beta.openai.com/docs/api-reference/completions/create#completions/create-n
+	// https://platform.openai.com/docs/api-reference/completions/create#completions/create-n
 	//
 	// Defaults to 1 if not specified.
 	N int `json:"n,omitempty"`
 
-	// https://beta.openai.com/docs/api-reference/completions/create#completions/create-stream
+	// https://platform.openai.com/docs/api-reference/completions/create#completions/create-stream
 	//
 	// Defaults to false if not specified.
 	Stream bool `json:"stream,omitempty"`
 
-	// https://beta.openai.com/docs/api-reference/completions/create#completions/create-logprobs
+	// https://platform.openai.com/docs/api-reference/completions/create#completions/create-logprobs
 	//
 	// Defaults to nil.
 	LogProbs *int `json:"logprobs,omitempty"`
 
-	// https://beta.openai.com/docs/api-reference/completions/create#completions/create-echo
+	// https://platform.openai.com/docs/api-reference/completions/create#completions/create-echo
 	//
 	// Defaults to false if not specified.
 	Echo bool `json:"echo,omitempty"`
 
-	// https://beta.openai.com/docs/api-reference/completions/create#completions/create-stop
+	// https://platform.openai.com/docs/api-reference/completions/create#completions/create-stop
 	Stop []string `json:"stop,omitempty"`
 
-	// https://beta.openai.com/docs/api-reference/completions/create#completions/create-presence_penalty
+	// https://platform.openai.com/docs/api-reference/completions/create#completions/create-presence_penalty
 	//
 	// Defaults to 0 if not specified.
 	PresencePenalty int `json:"presence_penalty,omitempty"`
 
-	// https://beta.openai.com/docs/api-reference/completions/create#completions/create-frequency_penalty
+	// https://platform.openai.com/docs/api-reference/completions/create#completions/create-frequency_penalty
 	//
 	// Defaults to 0 if not specified.
 	FrequencyPenalty int `json:"frequency_penalty,omitempty"`
 
-	// https://beta.openai.com/docs/api-reference/completions/create#completions/create-best_of
+	// https://platform.openai.com/docs/api-reference/completions/create#completions/create-best_of
 	//
 	// Defaults to 1 if not specified.
 	//
@@ -172,12 +172,12 @@ type CreateCompletionRequest struct {
 	//          Use carefully and ensure that you have reasonable settings for max_tokens and stop.
 	BestOf int `json:"best_of,omitempty"`
 
-	// https://beta.openai.com/docs/api-reference/completions/create#completions/create-logit_bias
+	// https://platform.openai.com/docs/api-reference/completions/create#completions/create-logit_bias
 	//
 	// Defaults to nil.
 	LogitBias map[string]float64 `json:"logit_bias,omitempty"`
 
-	// https://beta.openai.com/docs/api-reference/completions/create#completions/create-user
+	// https://platform.openai.com/docs/api-reference/completions/create#completions/create-user
 	//
 	// Defaults to nil.
 	User string `json:"user,omitempty"`
@@ -185,7 +185,7 @@ type CreateCompletionRequest struct {
 
 // CreateCompletionResponse is the response from a "completion" request to the OpenAI API.
 //
-// https://beta.openai.com/docs/api-reference/completions/create
+// https://platform.openai.com/docs/api-reference/completions/create
 type CreateCompletionResponse struct {
 	ID      string `json:"id"`
 	Object  string `json:"object"`
@@ -205,7 +205,13 @@ type CreateCompletionResponse struct {
 }
 
 // CreateCompletion performs a "completion" request using the OpenAI API.
-// This is the fundamental request for the API.
+//
+// # Warning
+//
+// The completions API endpoint received its final update in July 2023 and
+// has a different interface than the new [chat completions] endpoint. Instead
+// of the input being a list of messages, the input is a freeform text string
+// called a prompt.
 //
 // # Example
 //
@@ -215,7 +221,12 @@ type CreateCompletionResponse struct {
 //		MaxTokens: 16,
 //	 })
 //
-// https://beta.openai.com/docs/api-reference/completions/create
+// Deprecated:  [github.com/picatz/openai.Client.CreateCompletion] is [deprecated] (legacy). Use [github.com/picatz/openai.Client.CreateChat] instead.
+//
+// https://platform.openai.com/docs/api-reference/completions/create
+//
+// [deprecated]: https://platform.openai.com/docs/guides/gpt/completions-api
+// [chat completions]: https://platform.openai.com/docs/api-reference/chat/create
 func (c *Client) CreateCompletion(ctx context.Context, req *CreateCompletionRequest) (*CreateCompletionResponse, error) {
 	b, err := json.Marshal(req)
 	if err != nil {
@@ -252,7 +263,7 @@ func (c *Client) CreateCompletion(ctx context.Context, req *CreateCompletionRequ
 	return cResp, nil
 }
 
-// https://beta.openai.com/docs/api-reference/models/list
+// https://platform.openai.com/docs/api-reference/models/list
 type Models struct {
 	Object string `json:"object"`
 	Data   []struct {
@@ -289,7 +300,7 @@ type Models struct {
 //	   fmt.Println(model.ID)
 //	}
 //
-// https://beta.openai.com/docs/api-reference/models/list
+// https://platform.openai.com/docs/api-reference/models/list
 func (c *Client) ListModels(ctx context.Context) (*Models, error) {
 	r, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/models", nil)
 	if err != nil {
@@ -323,32 +334,32 @@ func (c *Client) ListModels(ctx context.Context) (*Models, error) {
 
 // CreateEditRequest is the request for a "edit" request to the OpenAI API.
 //
-// https://beta.openai.com/docs/api-reference/edits/create
+// https://platform.openai.com/docs/api-reference/edits/create
 type CreateEditRequest struct {
-	// https://beta.openai.com/docs/api-reference/edits/create#edits/create-model
+	// https://platform.openai.com/docs/api-reference/edits/create#edits/create-model
 	//
 	// Required.
 	Model string `json:"model"`
 
-	// https://beta.openai.com/docs/api-reference/edits/create#edits/create-instruction
+	// https://platform.openai.com/docs/api-reference/edits/create#edits/create-instruction
 	//
 	// Required.
 	Instruction string `json:"instruction"`
 
-	// https://beta.openai.com/docs/api-reference/edits/create#edits/create-input
+	// https://platform.openai.com/docs/api-reference/edits/create#edits/create-input
 	Input string `json:"input"`
 
-	// https://beta.openai.com/docs/api-reference/edits/create#edits/create-n
+	// https://platform.openai.com/docs/api-reference/edits/create#edits/create-n
 	N int `json:"n,omitempty"`
 
-	// https://beta.openai.com/docs/api-reference/edits/create#edits/create-temperature
+	// https://platform.openai.com/docs/api-reference/edits/create#edits/create-temperature
 	Temperature float64 `json:"temperature,omitempty"`
 
-	// https://beta.openai.com/docs/api-reference/edits/create#edits/create-top-p
+	// https://platform.openai.com/docs/api-reference/edits/create#edits/create-top-p
 	TopP float64 `json:"top_p,omitempty"`
 }
 
-// https://beta.openai.com/docs/api-reference/edits/create
+// https://platform.openai.com/docs/api-reference/edits/create
 type CreateEditResponse struct {
 	Object  string `json:"object"`
 	Created int    `json:"created"`
@@ -365,6 +376,11 @@ type CreateEditResponse struct {
 
 // CreateEdit performs a "edit" request using the OpenAI API.
 //
+// # Warning
+//
+// Users of the Edits API and its associated models (e.g., text-davinci-edit-001 or code-davinci-edit-001)
+// will need to migrate to GPT-3.5 Turbo by January 4, 2024.
+//
 // # Example
 //
 //	resp, _ := client.CreateEdit(ctx, &CreateEditRequest{
@@ -373,7 +389,11 @@ type CreateEditResponse struct {
 //		Input:       "This is a test",
 //	})
 //
-// https://beta.openai.com/docs/api-reference/edits/create
+// Deprecated: [github.com/picatz/openai.Client.CreateEdit] is [deprecated] (legacy). Use [github.com/picatz/openai.Client.CreateChat] instead.
+//
+// https://platform.openai.com/docs/api-reference/edits/create
+//
+// [deprecated]: https://openai.com/blog/gpt-4-api-general-availability
 func (c *Client) CreateEdit(ctx context.Context, req *CreateEditRequest) (*CreateEditResponse, error) {
 	b, err := json.Marshal(req)
 	if err != nil {
@@ -412,29 +432,29 @@ func (c *Client) CreateEdit(ctx context.Context, req *CreateEditRequest) (*Creat
 	return cResp, nil
 }
 
-// https://beta.openai.com/docs/api-reference/images/create
+// https://platform.openai.com/docs/api-reference/images/create
 type CreateImageRequest struct {
-	// https://beta.openai.com/docs/api-reference/images/create#images/create-prompt
+	// https://platform.openai.com/docs/api-reference/images/create#images/create-prompt
 	//
 	// Required. Max of 1,000 characters.
 	Prompt string `json:"prompt"`
 
-	// https://beta.openai.com/docs/api-reference/completions/create#completions/create-n
+	// https://platform.openai.com/docs/api-reference/completions/create#completions/create-n
 	//
 	// Number of images to generate. Defaults to 1 if not specified. Most be between 1 and 10.
 	N int `json:"n,omitempty"`
 
-	// https://beta.openai.com/docs/api-reference/images/create#images/create-size
+	// https://platform.openai.com/docs/api-reference/images/create#images/create-size
 	//
 	// Size of the image to generate. Must be one of 256x256, 512x512, or 1024x1024.
 	Size string `json:"size,omitempty"`
 
-	// https://beta.openai.com/docs/api-reference/images/create#images/create-response_format
+	// https://platform.openai.com/docs/api-reference/images/create#images/create-response_format
 	//
 	// Defaults to "url". The format in which the generated images are returned. Must be one of "url" or "b64_json".
 	ResponseFormat string `json:"response_format,omitempty"`
 
-	// https://beta.openai.com/docs/api-reference/images/create#images/create-user
+	// https://platform.openai.com/docs/api-reference/images/create#images/create-user
 	User string `json:"user,omitempty"`
 }
 
@@ -459,7 +479,7 @@ type CreateImageResponse struct {
 //		ResponseFormat: "url",
 //	})
 //
-// https://beta.openai.com/docs/api-reference/images/create
+// https://platform.openai.com/docs/api-reference/images/create
 func (c *Client) CreateImage(ctx context.Context, req *CreateImageRequest) (*CreateImageResponse, error) {
 	b, err := json.Marshal(req)
 	if err != nil {
@@ -2295,5 +2315,5 @@ func (c *Client) CreateAudioTranscription(ctx context.Context, req *CreateAudioT
 }
 
 // TODO:
-// - https://beta.openai.com/docs/api-reference/images/create-edit
-// - https://beta.openai.com/docs/api-reference/images/create-variation
+// - https://platform.openai.com/docs/api-reference/images/create-edit
+// - https://platform.openai.com/docs/api-reference/images/create-variation
