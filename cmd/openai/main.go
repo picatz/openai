@@ -292,7 +292,7 @@ func startChat(client *openai.Client, model string) {
 		// which is 4096
 		tokens += resp.Usage.TotalTokens
 
-		if tokens > 4000 {
+		if tokens > 8000 {
 			summary, summaryTokens := summarizeMessages(client, model, messages, 0)
 
 			// Print the generated summary so the user can see what the bot is
