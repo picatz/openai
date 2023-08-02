@@ -63,8 +63,6 @@ var RateLimits = NewRateLimiters()
 func NewRateLimiters() *RateLimiters {
 	rl := &RateLimiters{}
 
-	rl.Chat.Requests.Wait()
-
 	rl.Chat.Requests = rate.NewLimiter(rate.Every(1*time.Minute), 3500)
 	rl.Chat.Tokens = rate.NewLimiter(rate.Every(1*time.Minute), 90000)
 
