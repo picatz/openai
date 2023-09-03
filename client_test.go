@@ -213,12 +213,12 @@ func TestMessageJSONUnmarshal(t *testing.T) {
 
 	args := msg.FunctionCall.Arguments
 
-	locationArg, err := openai.GetTypedFunctionCallArgumentValue[string]("location", args)
+	locationArg, err := openai.FunctionCallArgumentValue[string]("location", args)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	unitArg, err := openai.GetTypedFunctionCallArgumentValue[string]("unit", args)
+	unitArg, err := openai.FunctionCallArgumentValue[string]("unit", args)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,12 +286,12 @@ func TestCreateChat_FunctionCall(t *testing.T) {
 
 	args := resp.Choices[0].Message.FunctionCall.Arguments
 
-	locationArg, err := openai.GetTypedFunctionCallArgumentValue[string]("location", args)
+	locationArg, err := openai.FunctionCallArgumentValue[string]("location", args)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	unitArg, err := openai.GetTypedFunctionCallArgumentValue[string]("unit", args)
+	unitArg, err := openai.FunctionCallArgumentValue[string]("unit", args)
 	if err != nil {
 		t.Fatal(err)
 	}

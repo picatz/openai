@@ -1499,14 +1499,21 @@ func (c *Client) DeleteFineTuneModel(ctx context.Context, req *DeleteFineTuneMod
 // FunctionCallArguments is a map of argument name to value.
 type FunctionCallArguments map[string]any
 
-// GetFunctionCallArgumentValue returns the value of the argument with the given name.
-func GetTypedFunctionCallArgumentValue[T any](name string, args FunctionCallArguments) (T, error) {
+// FunctionCallArgumentValue returns the value of the argument with the given name.
+func FunctionCallArgumentValue[T any](name string, args FunctionCallArguments) (T, error) {
 	v, ok := args[name].(T)
 	if !ok {
-		return v, fmt.Errorf("argument %q is not of type %T", name, v)
+		return v, fmt.Errorf("argument %q is a %T not of type %T", name, args[name], v)
 	}
 
 	return v, nil
+}
+
+// Deprecated: Use FunctionCallArgumentValue instead.
+//
+// This function is deprecated and will be removed in a future release.
+func GetTypedFunctionCallArgumentValue[T any](name string, args FunctionCallArguments) (T, error) {
+	return FunctionCallArgumentValue[T](name, args)
 }
 
 // FunctionCall describes a function call.
