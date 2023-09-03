@@ -301,6 +301,568 @@ func TestCreateChat_FunctionCall(t *testing.T) {
 	t.Logf("currentWeather: %q", currentWeather)
 }
 
+func TestCreateChat_FunctionCall_AssistantAgent(t *testing.T) {
+	c := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
+
+	ctx := testCtx(t)
+
+	// fn is a generic way to define a function that can be called by the model
+	type fn struct {
+		description string
+		parameters  *openai.JSONSchema
+		call        func(...any) string
+	}
+
+	// fnMap are a bunch of named functions that can be called by the model
+	fnMap := map[string]fn{
+		"getCurrentWeather": {
+			description: "Gets the current weather in a location from the given location and unit.",
+			parameters: &openai.JSONSchema{
+				Type: "object",
+				Properties: map[string]*openai.JSONSchema{
+					"location": {
+						Type:        "string",
+						Description: "The city and state, e.g. San Francisco, CA",
+					},
+					"unit": {
+						Type: "string",
+						Enum: []string{"fahrenheit", "celsius"},
+					},
+				},
+				Required: []string{"location", "unit"},
+			},
+			call: func(args ...any) string {
+				locationArg := args[0].(string)
+				unitArg := args[1].(string)
+				return fmt.Sprintf("The current temperature in %s is 72 degrees %s.", locationArg, unitArg)
+			},
+		},
+		"remindMe": {
+			description: "Reminds the user of something at a given time.",
+			parameters: &openai.JSONSchema{
+				Type: "object",
+				Properties: map[string]*openai.JSONSchema{
+					"reminder": {
+						Type:        "string",
+						Description: "The reminder to set.",
+					},
+					"time": {
+						Type:        "string",
+						Description: "The time to set the reminder for.",
+					},
+				},
+				Required: []string{"reminder", "time"},
+			},
+			call: func(args ...any) string {
+				reminderArg := args[0].(string)
+				timeArg := args[1].(string)
+				return fmt.Sprintf("Reminder set for %s: %s", timeArg, reminderArg)
+			},
+		},
+		"timer": {
+			description: "Sets a timer for a given amount of time.",
+			parameters: &openai.JSONSchema{
+				Type: "object",
+				Properties: map[string]*openai.JSONSchema{
+					"duration": {
+						Type:        "string",
+						Description: "The duration of the timer.",
+					},
+				},
+				Required: []string{"duration"},
+			},
+			call: func(args ...any) string {
+				durationArg := args[0].(string)
+				return fmt.Sprintf("Timer set for %s", durationArg)
+			},
+		},
+		"setAlarm": {
+			description: "Sets an alarm for a given time.",
+			parameters: &openai.JSONSchema{
+				Type: "object",
+				Properties: map[string]*openai.JSONSchema{
+					"time": {
+						Type:        "string",
+						Description: "The time to set the alarm for.",
+					},
+				},
+				Required: []string{"time"},
+			},
+			call: func(args ...any) string {
+				timeArg := args[0].(string)
+				return fmt.Sprintf("Alarm set for %s", timeArg)
+			},
+		},
+		"scheduleMeeting": {
+			description: "Schedules a meeting for a given time.",
+			parameters: &openai.JSONSchema{
+				Type: "object",
+				Properties: map[string]*openai.JSONSchema{
+					"time": {
+						Type:        "string",
+						Description: "The time to schedule the meeting for.",
+					},
+					"people": {
+						Type: "array",
+						Items: &openai.JSONSchema{
+							Type:        "string",
+							Description: "The person to invite to the meeting.",
+						},
+						Description: "The people to invite to the meeting.",
+					},
+					"message": {
+						Type:        "string",
+						Description: "The message to send to the people invited to the meeting.",
+					},
+				},
+				Required: []string{"time", "people", "message"},
+			},
+			call: func(args ...any) string {
+				timeArg := args[0].(string)
+				peopleArg := args[1].([]string)
+				messageArg := args[2].(string)
+
+				people := strings.Join(peopleArg, ", ")
+
+				return fmt.Sprintf("Meeting scheduled for %s with %s. Message: %s", timeArg, people, messageArg)
+			},
+		},
+	}
+
+	// seed messages for the test chat
+	openaiMessages := []openai.ChatMessage{
+		{
+			Role:    "system",
+			Content: "You are a helpful assitant. It's currently 9:00 AM, and the user is in Ann Arbor, Michigan, USA.",
+		},
+		{
+			Role:    "user",
+			Content: "What's the weather going to be like today?",
+		},
+	}
+
+	// functions that the model can call, in the right format for the API
+	openaiFunctions := func() []*openai.Function {
+		fns := []*openai.Function{}
+		for name, fn := range fnMap {
+			fns = append(fns, &openai.Function{
+				Name:        name,
+				Description: fn.description,
+				Parameters:  fn.parameters,
+			})
+		}
+		return fns
+	}()
+
+	resp, err := c.CreateChat(ctx, &openai.CreateChatRequest{
+		Model:        openai.ModelGPT35Turbo0613,
+		Messages:     openaiMessages,
+		FunctionCall: openai.FunctionCallAuto,
+		Functions:    openaiFunctions,
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add the response to the messages
+	openaiMessages = append(openaiMessages, resp.Choices[0].Message)
+
+	if len(resp.Choices) == 0 {
+		t.Fatal("expected at least one choice")
+	}
+
+	t.Logf("resp: %#+v", resp.Choices[0].Message)
+
+	if resp.Choices[0].Message.FunctionCall == nil {
+		t.Fatal("expected function to be non-nil")
+	}
+
+	if resp.Choices[0].Message.FunctionCall.Name != "getCurrentWeather" {
+		t.Fatalf("expected function name to be %q, got %q", "getCurrentWeather", resp.Choices[0].Message.FunctionCall.Name)
+	}
+
+	fnName := resp.Choices[0].Message.FunctionCall.Name
+
+	args := resp.Choices[0].Message.FunctionCall.Arguments
+
+	locationArg, err := openai.FunctionCallArgumentValue[string]("location", args)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	unitArg, err := openai.FunctionCallArgumentValue[string]("unit", args)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	currentWeather := fnMap[fnName].call(locationArg, unitArg)
+
+	t.Logf("%s", currentWeather)
+
+	// Add the current weather to the messages
+	openaiMessages = append(openaiMessages, openai.ChatMessage{
+		Role:    "assistant",
+		Content: currentWeather,
+	})
+
+	// Now ask the assistant to remind us to do something
+	openaiMessages = append(openaiMessages, openai.ChatMessage{
+		Role:    "user",
+		Content: "Remind me to take out the trash at 8:00 PM",
+	})
+
+	resp, err = c.CreateChat(ctx, &openai.CreateChatRequest{
+		Model:        openai.ModelGPT35Turbo0613,
+		Messages:     openaiMessages,
+		FunctionCall: openai.FunctionCallAuto,
+		Functions:    openaiFunctions,
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add the response to the messages
+	openaiMessages = append(openaiMessages, resp.Choices[0].Message)
+
+	if len(resp.Choices) == 0 {
+		t.Fatal("expected at least one choice")
+	}
+
+	t.Logf("resp: %#+v", resp.Choices[0].Message)
+
+	if resp.Choices[0].Message.FunctionCall == nil {
+		t.Fatal("expected function to be non-nil")
+	}
+
+	if resp.Choices[0].Message.FunctionCall.Name != "remindMe" {
+		t.Fatalf("expected function name to be %q, got %q", "remindMe", resp.Choices[0].Message.FunctionCall.Name)
+	}
+
+	fnName = resp.Choices[0].Message.FunctionCall.Name
+
+	args = resp.Choices[0].Message.FunctionCall.Arguments
+
+	reminderArg, err := openai.FunctionCallArgumentValue[string]("reminder", args)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	timeArg, err := openai.FunctionCallArgumentValue[string]("time", args)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	reminder := fnMap[fnName].call(reminderArg, timeArg)
+
+	t.Logf("%s", reminder)
+
+	// Add the reminder to the messages
+	openaiMessages = append(openaiMessages, openai.ChatMessage{
+		Role:    "assistant",
+		Content: reminder,
+	})
+
+	// Now ask the assistant to set a timer
+	openaiMessages = append(openaiMessages, openai.ChatMessage{
+		Role:    "user",
+		Content: "Set a timer for 5 minutes",
+	})
+
+	resp, err = c.CreateChat(ctx, &openai.CreateChatRequest{
+		Model:        openai.ModelGPT35Turbo0613,
+		Messages:     openaiMessages,
+		FunctionCall: openai.FunctionCallAuto,
+		Functions:    openaiFunctions,
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add the response to the messages
+	openaiMessages = append(openaiMessages, resp.Choices[0].Message)
+
+	if len(resp.Choices) == 0 {
+		t.Fatal("expected at least one choice")
+	}
+
+	t.Logf("resp: %#+v", resp.Choices[0].Message)
+
+	if resp.Choices[0].Message.FunctionCall == nil {
+		t.Fatal("expected function to be non-nil")
+	}
+
+	if resp.Choices[0].Message.FunctionCall.Name != "timer" {
+		t.Fatalf("expected function name to be %q, got %q", "timer", resp.Choices[0].Message.FunctionCall.Name)
+	}
+
+	fnName = resp.Choices[0].Message.FunctionCall.Name
+
+	args = resp.Choices[0].Message.FunctionCall.Arguments
+
+	durationArg, err := openai.FunctionCallArgumentValue[string]("duration", args)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	timer := fnMap[fnName].call(durationArg)
+
+	t.Logf("%s", timer)
+
+	// Add the timer to the messages
+	openaiMessages = append(openaiMessages, openai.ChatMessage{
+		Role:    "assistant",
+		Content: timer,
+	})
+
+	// Now ask the assistant to set an alarm
+	openaiMessages = append(openaiMessages, openai.ChatMessage{
+		Role:    "user",
+		Content: "Set an alarm for 8:00 PM",
+	})
+
+	resp, err = c.CreateChat(ctx, &openai.CreateChatRequest{
+		Model:        openai.ModelGPT35Turbo0613,
+		Messages:     openaiMessages,
+		FunctionCall: openai.FunctionCallAuto,
+		Functions:    openaiFunctions,
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add the response to the messages
+	openaiMessages = append(openaiMessages, resp.Choices[0].Message)
+
+	if len(resp.Choices) == 0 {
+		t.Fatal("expected at least one choice")
+	}
+
+	t.Logf("resp: %#+v", resp.Choices[0].Message)
+
+	if resp.Choices[0].Message.FunctionCall == nil {
+		t.Fatal("expected function to be non-nil")
+	}
+
+	if resp.Choices[0].Message.FunctionCall.Name != "setAlarm" {
+		t.Fatalf("expected function name to be %q, got %q", "setAlarm", resp.Choices[0].Message.FunctionCall.Name)
+	}
+
+	fnName = resp.Choices[0].Message.FunctionCall.Name
+
+	args = resp.Choices[0].Message.FunctionCall.Arguments
+
+	timeArg, err = openai.FunctionCallArgumentValue[string]("time", args)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	alarm := fnMap[fnName].call(timeArg)
+
+	t.Logf("%s", alarm)
+
+	// schedule a meeting
+	openaiMessages = append(openaiMessages, openai.ChatMessage{
+		Role:    "user",
+		Content: "Schedule a meeting for 3:00 PM with John, Jane, and Joe to talk about our favorite books.",
+	})
+
+	resp, err = c.CreateChat(ctx, &openai.CreateChatRequest{
+		Model:        openai.ModelGPT35Turbo0613,
+		Messages:     openaiMessages,
+		FunctionCall: openai.FunctionCallAuto,
+		Functions:    openaiFunctions,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// check if the meeting was scheduled
+	if resp.Choices[0].Message.FunctionCall == nil {
+		t.Fatal("expected function to be non-nil")
+	}
+
+	if resp.Choices[0].Message.FunctionCall.Name != "scheduleMeeting" {
+		t.Fatalf("expected function name to be %q, got %q", "scheduleMeeting", resp.Choices[0].Message.FunctionCall.Name)
+	}
+
+	fnName = resp.Choices[0].Message.FunctionCall.Name
+
+	args = resp.Choices[0].Message.FunctionCall.Arguments
+
+	timeArg, err = openai.FunctionCallArgumentValue[string]("time", args)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	peopleAnyArg, err := openai.FunctionCallArgumentValue[[]any]("people", args)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	peopleArg := make([]string, len(peopleAnyArg))
+	for i, v := range peopleAnyArg {
+		peopleArg[i] = v.(string)
+	}
+
+	messageArg, err := openai.FunctionCallArgumentValue[string]("message", args)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	meeting := fnMap[fnName].call(timeArg, peopleArg, messageArg)
+
+	t.Logf("%s", meeting)
+}
+
+func TestCreateChat_FunctionCall_LinuxAssistantAgent(t *testing.T) {
+	c := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
+
+	ctx := testCtx(t)
+
+	// fn is a generic way to define a function that can be called by the model
+	type fn struct {
+		description string
+		parameters  *openai.JSONSchema
+		call        func(...any) string
+	}
+
+	// fnMap are a bunch of named functions that can be called by the model
+	fnMap := map[string]fn{
+		"run": {
+			description: "Runs a command on the Linux machine.",
+			parameters: &openai.JSONSchema{
+				Type: "object",
+				Properties: map[string]*openai.JSONSchema{
+					"command": {
+						Type:        "string",
+						Description: "The command to run.",
+					},
+				},
+				Required: []string{"command"},
+			},
+			call: func(args ...any) string {
+				commandArg := args[0].(string)
+				return fmt.Sprintf("Running command: %s", commandArg)
+			},
+		},
+		"connect": {
+			description: "Connects to a Linux machine using SSH.",
+			parameters: &openai.JSONSchema{
+				Type: "object",
+				Properties: map[string]*openai.JSONSchema{
+					"host": {
+						Type:        "string",
+						Description: "The host to connect to.",
+					},
+					"username": {
+						Type:        "string",
+						Description: "The username to use when connecting.",
+					},
+				},
+				Required: []string{"host"},
+			},
+			call: func(args ...any) string {
+				hostArg := args[0].(string)
+
+				if usernameArg, ok := args[1].(string); ok {
+					return fmt.Sprintf("Connected to %q as %q", hostArg, usernameArg)
+				}
+
+				return fmt.Sprintf("Connected to %q as %q", hostArg, "root")
+			},
+		},
+		"disconnect": {
+			description: "Disconnects from a Linux machine.",
+			parameters: &openai.JSONSchema{
+				Type: "object",
+				Properties: map[string]*openai.JSONSchema{
+					"message": {
+						Type:        "string",
+						Description: "The short, fun (fortune style) message to display when disconnecting.",
+					},
+				},
+				Required: []string{"message"},
+			},
+			call: func(args ...any) string {
+				return "Disconnected"
+			},
+		},
+	}
+
+	// seed messages for the test chat
+	openaiMessages := []openai.ChatMessage{
+		{
+			Role:    "system",
+			Content: "You are a helpful assistant to use a Linux machine with natural language.",
+		},
+		{
+			Role:    "user",
+			Content: "What system am I using?",
+		},
+	}
+
+	// functions that the model can call, in the right format for the API
+	openaiFunctions := func() []*openai.Function {
+		fns := []*openai.Function{}
+		for name, fn := range fnMap {
+			fns = append(fns, &openai.Function{
+				Name:        name,
+				Description: fn.description,
+				Parameters:  fn.parameters,
+			})
+		}
+		return fns
+	}()
+
+	resp, err := c.CreateChat(ctx, &openai.CreateChatRequest{
+		Model:        openai.ModelGPT35Turbo0613,
+		Messages:     openaiMessages,
+		FunctionCall: openai.FunctionCallAuto,
+		Functions:    openaiFunctions,
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add the response to the messages
+	// openaiMessages = append(openaiMessages, resp.Choices[0].Message)
+
+	if len(resp.Choices) == 0 {
+		t.Fatal("expected at least one choice")
+	}
+
+	if resp.Choices[0].Message.FunctionCall == nil {
+		t.Fatal("expected function to be non-nil")
+	}
+
+	if resp.Choices[0].Message.FunctionCall.Name != "run" {
+		t.Fatalf("expected function name to be %q, got %q", "run", resp.Choices[0].Message.FunctionCall.Name)
+	}
+
+	fnName := resp.Choices[0].Message.FunctionCall.Name
+
+	args := resp.Choices[0].Message.FunctionCall.Arguments
+
+	commandArg, err := openai.FunctionCallArgumentValue[string]("command", args)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	command := fnMap[fnName].call(commandArg)
+
+	// should contain the "uname" command
+	if !strings.Contains(command, "uname") {
+		t.Fatalf("expected command to contain %q, got %q", "uname", command)
+	}
+
+	t.Logf("%s", command)
+}
+
 func TestCreateAudioTranscription(t *testing.T) {
 	c := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
 
