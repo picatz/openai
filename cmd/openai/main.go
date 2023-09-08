@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -179,6 +180,8 @@ func main() {
 	}
 }
 
+var cacheFilePath = os.Getenv("HOME") + "/.openai-cli-chat-cache"
+
 // startChat starts an interactive chat session with the OpenAI API, this is a REPL-like
 // command-line program that allows you to chat with the API.
 func startChat(client *openai.Client, model string) {
@@ -187,6 +190,29 @@ func startChat(client *openai.Client, model string) {
 
 	// Keep track of the chat messages, both from the user and the API.
 	messages := []openai.ChatMessage{}
+
+	// Open cache file from users home directory.
+	f, err := os.OpenFile(cacheFilePath, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s", err)
+		os.Exit(1)
+	}
+
+	if fi, err := f.Stat(); err == nil && fi.Size() > 0 {
+		// Read and parse the cache file into messages.
+		err = json.NewDecoder(f).Decode(&messages)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s", err)
+			os.Exit(1)
+		}
+	}
+
+	// Close the cache file.
+	err = f.Close()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s", err)
+		os.Exit(1)
+	}
 
 	var systemMessage openai.ChatMessage
 
@@ -212,7 +238,15 @@ func startChat(client *openai.Client, model string) {
 			break
 		}
 
-		// Check if the user wants to erase.
+		// Check if the user wants to erase the whole chat.
+		if strings.TrimSpace(input) == "erase" {
+			// Reset the messages.
+			messages = []openai.ChatMessage{}
+			tokens = 0
+			continue
+		}
+
+		// Check if the user wants to erase the last message.
 		if strings.TrimSpace(input) == "delete" {
 			// Remove the last message.
 			if len(messages) > 0 {
@@ -292,7 +326,7 @@ func startChat(client *openai.Client, model string) {
 		// which is 4096
 		tokens += resp.Usage.TotalTokens
 
-		if tokens > 8000 {
+		if tokens >= 8000 {
 			summary, summaryTokens := summarizeMessages(client, model, messages, 0)
 
 			// Print the generated summary so the user can see what the bot is
@@ -319,6 +353,27 @@ func startChat(client *openai.Client, model string) {
 			// Reset the token count.
 			tokens = summaryTokens
 		}
+	}
+
+	// Save the messages to the cache file.
+	f, err = os.OpenFile(cacheFilePath, os.O_TRUNC|os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s", err)
+		os.Exit(1)
+	}
+
+	// Write the messages to the cache file.
+	err = json.NewEncoder(f).Encode(messages)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s", err)
+		os.Exit(1)
+	}
+
+	// Close the cache file.
+	err = f.Close()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s", err)
+		os.Exit(1)
 	}
 }
 
