@@ -422,7 +422,6 @@ func startChat(client *openai.Client, model string) {
 		}
 
 		bt.WriteString(s)
-		bt.WriteString("\n")
 
 		// Add the bot response to the messages.
 		messages = append(messages, resp.Choices[0].Message)
