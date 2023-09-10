@@ -1,14 +1,23 @@
 # OpenAI [![Go Reference](https://pkg.go.dev/badge/github.com/picatz/openai.svg)](https://pkg.go.dev/github.com/picatz/openai) [![Go Report Card](https://goreportcard.com/badge/github.com/picatz/openai)](https://goreportcard.com/report/github.com/picatz/openai) [![License: MPL 2.0](https://img.shields.io/badge/License-MPL_2.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0) 
  
-An unofficial community-maintained Go client package and CLI for OpenAI's API.
+An unofficial community-maintained Go client package and CLI for OpenAI.
 
 ## Installation
 
-To use this package, you must have a valid OpenAI API key. You can get one [here](https://platform.openai.com/).
+To use this package in your own Go project:
 
 ```console
 $ go get github.com/picatz/openai@latest
 ```
+
+To use the `openai` CLI:
+
+```console
+$ go install github.com/picatz/openai/cmd/openai@latest
+```
+
+> **Note**
+> To use this package, you must have a valid OpenAI API key. You can get one [here](https://platform.openai.com/).
 
 ## Usage
 
