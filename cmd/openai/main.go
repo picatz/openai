@@ -427,7 +427,7 @@ func startChat(client *openai.Client, model string) {
 		messages = append(messages, resp.Choices[0].Message)
 
 		// Keep track of tokens used for the session to avoid going over the limit
-		// which is 4096
+		// which is generally 4096 for gpt3 and 8000 for gpt4.
 		tokens += resp.Usage.TotalTokens
 
 		if tokens >= 8000 {
