@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -13,6 +14,13 @@ import (
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/picatz/openai"
+	"golang.org/x/term"
+)
+
+var (
+	styleBold   = lipgloss.NewStyle().Bold(true)
+	styleFaint  = lipgloss.NewStyle().Faint(true)
+	numberColor = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("69"))
 )
 
 // TODO: make cross platform, macos only for now
@@ -185,8 +193,6 @@ var cacheFilePath = os.Getenv("HOME") + "/.openai-cli-chat-cache"
 // startChat starts an interactive chat session with the OpenAI API, this is a REPL-like
 // command-line program that allows you to chat with the API.
 func startChat(client *openai.Client, model string) {
-	// Print a welcome message to explain how to use the chat mode.
-	fmt.Print("Welcome to the OpenAI API CLI chat mode. Type '\033[2mdelete\033[0m' to forget last message. Type '\033[2mexit\033[0m' to quit.\n\n")
 
 	// Keep track of the chat messages, both from the user and the API.
 	messages := []openai.ChatMessage{}
@@ -216,26 +222,119 @@ func startChat(client *openai.Client, model string) {
 
 	var systemMessage openai.ChatMessage
 
+	// Set the terminal to raw mode.
+	oldState, err := term.MakeRaw(0)
+	if err != nil {
+		panic(err)
+	}
+	defer term.Restore(0, oldState)
+
+	termWidth, termHeight, err := term.GetSize(0)
+	if err != nil {
+		panic(err)
+	}
+
+	termReadWriter := struct {
+		io.Reader
+		io.Writer
+	}{os.Stdin, os.Stdout}
+
+	t := term.NewTerminal(termReadWriter, "") // Will set the prompt later.
+
+	t.SetSize(termWidth, termHeight)
+
+	// Use buffered output so we can write to the terminal without
+	// having to wait for a newline, and so we can clear the screen
+	// and move the cursor around without having to worry about
+	// overwriting the prompt.
+	bt := bufio.NewWriter(t)
+
+	cls := func() {
+		// Clear the screen.
+		bt.WriteString("\033[2J")
+
+		// Move to the top left.
+		bt.WriteString("\033[H")
+
+		// Flush the buffer to the terminal.
+		bt.Flush()
+	}
+
+	cls()
+
 	tokens := 0
 
-	for {
-		// Print a prompt to the user using bold ANSI escape codes.
-		fmt.Printf("\033[1m(messages: %d: tokens: %d)> \033[0m", len(messages), tokens)
+	// Print a welcome message to explain how to use the chat mode.
+	// t.Write([]byte("Welcome to the OpenAI API CLI chat mode. Type '\033[2mdelete\033[0m' to forget last message. Type '\033[2mexit\033[0m' to quit.\n\n"))
 
-		// Read up to 4096 characters from STDIN.
-		b := make([]byte, 4096)
-		n, err := io.ReadAtLeast(os.Stdin, b, 1)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s", err)
-			os.Exit(1)
+	// Autocomplete for commands.
+	t.AutoCompleteCallback = func(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
+		// If the user presses tab, then autocomplete the command.
+		if key == '\t' {
+			for _, cmd := range []string{"exit", "clear", "delete", "copy", "erase", "system:", "<clipboard>"} {
+				if strings.HasPrefix(cmd, line) {
+					// Autocomplete the command.
+					// t.Write([]byte(cmd[len(line):]))
+
+					// Return the new line and position, which must come after the
+					// command.
+					return cmd, len(cmd), true
+				}
+			}
 		}
 
-		// Get the user input.
-		input := strings.Trim(string(b[:n]), "\r")
+		// If the user hit backspace on the example system message, then we'll
+		// just delete the whole line, re-add the "system:" prefix, and return
+		// the new line and position.
+
+		// Otherwise, we'll just return the line.
+		return line, pos, false
+	}
+
+	// Print welcome message.
+	bt.WriteString(styleBold.Render("Welcome to the OpenAI API CLI chat mode!"))
+	bt.WriteString("\n\n")
+	bt.WriteString(styleBold.Render("Commands") + " " + styleFaint.Render("(tab complete)") + "\n\n")
+	bt.WriteString("- " + styleFaint.Render("delete") + " to forget last message.\n")
+	bt.WriteString("- " + styleFaint.Render("erase") + " to forget all messages.\n")
+	bt.WriteString("- " + styleFaint.Render("clear") + " to clear screen.\n")
+	bt.WriteString("- " + styleFaint.Render("copy") + " to copy last message to clipboard.\n")
+	bt.WriteString("- " + styleFaint.Render("exit") + " to quit.\n\n")
+	bt.WriteString("Use '" + styleFaint.Render("<clipboard>") + "' to include clipboard content in a message.\n\n")
+	bt.Flush()
+
+	for {
+		// Move to left edge.
+		bt.WriteString("\033[0G")
+
+		// Print the prompt.
+		bt.WriteString(styleBold.Render(styleBold.Render("(") +
+			"messages: " + numberColor.Render(fmt.Sprintf("%d", len(messages))) + " " +
+			"tokens: " + numberColor.Render(fmt.Sprintf("%d", tokens)) +
+			styleBold.Render(")") +
+			" > "))
+
+		// Flush the buffer to the terminal.
+		bt.Flush()
+
+		// Read up to line from STDIN.
+		input, err := t.ReadLine()
+		if err != nil {
+			bt.WriteString(err.Error())
+			bt.Flush()
+			return
+		}
 
 		// Check if the user wants to exit.
 		if strings.TrimSpace(input) == "exit" {
 			break
+		}
+
+		// Check if user wants to clear the screen.
+		if strings.TrimSpace(input) == "clear" {
+			// Clear the screen.
+			cls()
+			continue
 		}
 
 		// Check if the user wants to erase the whole chat.
@@ -261,8 +360,9 @@ func startChat(client *openai.Client, model string) {
 				// Write the last message to the clipboard.
 				err := writeClipboard(messages[len(messages)-1].Content)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "%s", err)
-					os.Exit(1)
+					bt.WriteString(err.Error())
+					bt.Flush()
+					return
 				}
 			}
 			continue
@@ -273,8 +373,9 @@ func startChat(client *openai.Client, model string) {
 			// Get the clipboard contents.
 			str, err := readClipboard()
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "%s", err)
-				os.Exit(1)
+				bt.WriteString(err.Error())
+				bt.Flush()
+				return
 			}
 
 			// Replace the <clipboard> tag with the clipboard contents.
@@ -292,9 +393,9 @@ func startChat(client *openai.Client, model string) {
 				Content: input,
 			}
 			messages = append(messages, systemMessage)
-			fmt.Print("\n\033[2m")
-			fmt.Println("Configured system.")
-			fmt.Print("\033[0m\n")
+
+			bt.WriteString(styleFaint.Render("Confiured system.\n"))
+
 			continue
 		}
 
@@ -307,17 +408,21 @@ func startChat(client *openai.Client, model string) {
 		resp, err := chatRequest(client, model, messages)
 
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s", err)
-			os.Exit(1)
+			bt.WriteString(err.Error())
+			bt.Flush()
+			return
 		}
 
 		// Print the output using markdown-friendly terminal rendering.
 		s, err := renderMarkdown(resp.Choices[0].Message.Content)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s", err)
-			os.Exit(1)
+			bt.WriteString(err.Error())
+			bt.Flush()
+			return
 		}
-		fmt.Println(s)
+
+		bt.WriteString(s)
+		bt.WriteString("\n")
 
 		// Add the bot response to the messages.
 		messages = append(messages, resp.Choices[0].Message)
@@ -332,7 +437,7 @@ func startChat(client *openai.Client, model string) {
 			// Print the generated summary so the user can see what the bot is
 			// thinking the conversation is about to inject any additional context
 			// that was forgotten or missed.
-			fmt.Println(
+			bt.WriteString(
 				lipgloss.NewStyle().
 					Width(80).
 					Background(lipgloss.Color("69")).
@@ -340,6 +445,7 @@ func startChat(client *openai.Client, model string) {
 					Padding(1, 2).
 					Render(summary),
 			)
+			bt.WriteString("\n")
 
 			// Reset the messages to the summary.
 			messages = []openai.ChatMessage{}
@@ -358,22 +464,25 @@ func startChat(client *openai.Client, model string) {
 	// Save the messages to the cache file.
 	f, err = os.OpenFile(cacheFilePath, os.O_TRUNC|os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s", err)
-		os.Exit(1)
+		bt.WriteString(err.Error())
+		bt.Flush()
+		return
 	}
 
 	// Write the messages to the cache file.
 	err = json.NewEncoder(f).Encode(messages)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s", err)
-		os.Exit(1)
+		bt.WriteString(err.Error())
+		bt.Flush()
+		return
 	}
 
 	// Close the cache file.
 	err = f.Close()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s", err)
-		os.Exit(1)
+		bt.WriteString(err.Error())
+		bt.Flush()
+		return
 	}
 }
 
@@ -384,14 +493,12 @@ func renderMarkdown(s string) (string, error) {
 		glamour.WithPreservedNewLines(),
 	)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to create markdown renderer: %w", err).Error(), nil
 	}
 
 	out, err := r.Render(s)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to render markdown: %w", err).Error(), nil
 	}
 
 	return out, nil
@@ -411,7 +518,7 @@ func chatRequest(client *openai.Client, model string, messages []openai.ChatMess
 		MaxTokens: 2048,
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create chat: %w", err)
 	}
 
 	return resp, nil
@@ -482,8 +589,8 @@ func summarizeMessages(client *openai.Client, model string, messages []openai.Ch
 			// Try again.
 			return summarizeMessages(client, model, messages, attempts)
 		}
-		fmt.Fprintf(os.Stderr, "failed to summarize previous chat messages after %d attempts: %s", attempts, err)
-		os.Exit(1)
+
+		panic(err)
 	}
 
 	return resp.Choices[0].Message.Content, resp.Usage.TotalTokens
