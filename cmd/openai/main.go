@@ -414,7 +414,7 @@ func startChat(client *openai.Client, model string) {
 		}
 
 		// Print the output using markdown-friendly terminal rendering.
-		s, err := renderMarkdown(resp.Choices[0].Message.Content)
+		s, err := renderMarkdown(strings.TrimRight(resp.Choices[0].Message.Content, "\n"))
 		if err != nil {
 			bt.WriteString(err.Error())
 			bt.Flush()
