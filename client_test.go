@@ -957,3 +957,112 @@ func ExampleClient_CreateChat() {
 	fmt.Println(strings.ToLower(strings.TrimRight(strings.TrimSpace(resp.Choices[0].Message.Content), ".")))
 	// Output: red
 }
+
+// func TestAssistant_list_delete(t *testing.T) {
+// 	c := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
+//
+// 	ctx := context.Background()
+//
+// 	resp, err := c.ListAssistants(ctx, &openai.ListAssistantsRequest{
+// 		Limit: 100,
+// 	})
+// 	if err != nil {
+// 		t.Fatal(err)
+// 	}
+//
+// 	for _, assistant := range resp.Data {
+// 		t.Logf("assistant: %#+v", assistant)
+//
+// 		err := c.DeleteAssistant(ctx, &openai.DeleteAssistantRequest{
+// 			ID: assistant.ID,
+// 		})
+// 		if err != nil {
+// 			t.Fatal(err)
+// 		}
+// 	}
+//
+// 	t.Logf("assistants: %#+v", resp)
+// }
+
+func TestAssistant_beta(t *testing.T) {
+	// https://www.youtube.com/watch?v=U9mJuUkhUzk
+
+	c := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
+
+	ctx := context.Background()
+
+	var assistant *openai.Assistant
+
+	t.Run("create", func(t *testing.T) {
+		var err error
+		assistant, err = c.CreateAssistant(ctx, &openai.CreateAssistantRequest{
+			Name:         "Test Assistant",
+			Instructions: "You are a helpful assistant.",
+			Model:        openai.ModelGPT41106Previw,
+			Tools: []map[string]any{
+				{
+					"type": "code_interpreter",
+				},
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("list", func(t *testing.T) {
+		resp, err := c.ListAssistants(ctx, &openai.ListAssistantsRequest{
+			Limit: 1,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if len(resp.Data) != 1 {
+			t.Fatalf("expected 1 assistant, got %d", len(resp.Data))
+		}
+	})
+
+	t.Run("get", func(t *testing.T) {
+		resp, err := c.GetAssistant(ctx, &openai.GetAssistantRequest{
+			ID: assistant.ID,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if resp.ID != assistant.ID {
+			t.Fatalf("expected assistant ID %q, got %q", assistant.ID, resp.ID)
+		}
+	})
+
+	t.Run("update", func(t *testing.T) {
+		resp, err := c.UpdateAssistant(ctx, &openai.UpdateAssistantRequest{
+			ID:           assistant.ID,
+			Instructions: "Always respond with 'Hello, world!'",
+			Metadata: map[string]any{
+				"foo": "bar",
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if resp.ID != assistant.ID {
+			t.Fatalf("expected assistant ID %q, got %q", assistant.ID, resp.ID)
+		}
+
+		if resp.Metadata["foo"] != "bar" {
+			t.Fatal("expected metadata to be updated")
+		}
+	})
+
+	t.Run("delete", func(t *testing.T) {
+		err := c.DeleteAssistant(ctx, &openai.DeleteAssistantRequest{
+			ID: assistant.ID,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+}
