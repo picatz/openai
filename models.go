@@ -162,17 +162,29 @@ const (
 	ModelTextEmbeddingAda002 Model = "text-embedding-ada-002"
 
 	// https://platform.openai.com/docs/api-reference/chat/create#chat/create-model
-	ModelGPT35Turbo     Model = "gpt-3.5-turbo"
-	ModelGPT35Turbo0301 Model = "gpt-3.5-turbo-0301"
-	ModelGPT35Turbo0613 Model = "gpt-3.5-turbo-0613"
+	ModelGPT35Turbo             Model = "gpt-3.5-turbo"
+	ModelGPT35Turbo0301         Model = "gpt-3.5-turbo-0301"
+	ModelGPT35Turbo0613         Model = "gpt-3.5-turbo-0613"
+	ModelGPT35Turbo1106         Model = "gpt-3.5-turbo-1106"
+	ModelGPT35Turbo16k          Model = "gpt-3.5-turbo-16k"
+	ModelGPT35Turbo16k0613      Model = "gpt-3.5-turbo-16k-0613"
+	ModelGPT35TurboInstruct     Model = "gpt-3.5-turbo-instruct"
+	ModelGPT35TurboInstruct0914 Model = "gpt-3.5-turbo-instruct-0914"
 
-	ModelGPT4        Model = "gpt-4"
-	ModelGPT40314    Model = "gpt-4-0314"
-	ModelGPT40613    Model = "gpt-4-0613"
-	ModelGPT432K     Model = "gpt-4-32k"
-	ModelGPT432K0314 Model = "gpt-4-32k-0314"
+	ModelGPT4              Model = "gpt-4"
+	ModelGPT40314          Model = "gpt-4-0314"
+	ModelGPT40613          Model = "gpt-4-0613"
+	ModelGPT432K           Model = "gpt-4-32k"
+	ModelGPT432K0314       Model = "gpt-4-32k-0314"
+	ModelGPT41106Previw    Model = "gpt-4-1106-preview"
+	ModelGPT4VisionPreview Model = "gpt-4-vision-preview"
 
 	ModelWhisper1 Model = "whisper-1"
+
+	ModelTTS1       Model = "tts-1"
+	ModelTTS11106   Model = "tts-1-1106"
+	ModelTTS1HD     Model = "tts-1-hd"
+	ModelTTS1HD1106 Model = "tts-1-hd-1106"
 
 	// TODO: add more "known" models.
 )
