@@ -2555,14 +2555,12 @@ func (c *Client) DeleteAssistant(ctx context.Context, req *DeleteAssistantReques
 	}
 
 	r.Header.Add("Content-Type", "application/json")
-
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
 
 	if c.Organization != "" {
 		r.Header.Set("OpenAI-Organization", c.Organization)
 	}
-
-	r.Header.Set("OpenAI-Beta", "assistants=v1")
 
 	resp, err := c.HTTPClient.Do(r)
 	if err != nil {
@@ -2614,14 +2612,12 @@ func (c *Client) ListAssistants(ctx context.Context, req *ListAssistantsRequest)
 	}
 
 	r.Header.Add("Content-Type", "application/json")
-
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
 
 	if c.Organization != "" {
 		r.Header.Set("OpenAI-Organization", c.Organization)
 	}
-
-	r.Header.Set("OpenAI-Beta", "assistants=v1")
 
 	q := r.URL.Query()
 
@@ -2699,14 +2695,12 @@ func (c *Client) CreateAssistantFile(ctx context.Context, req *CreateAssistantFi
 	}
 
 	r.Header.Add("Content-Type", "application/json")
-
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
 
 	if c.Organization != "" {
 		r.Header.Set("OpenAI-Organization", c.Organization)
 	}
-
-	r.Header.Set("OpenAI-Beta", "assistants=v1")
 
 	resp, err := c.HTTPClient.Do(r)
 	if err != nil {
@@ -2750,14 +2744,12 @@ func (c *Client) GetAssistantFile(ctx context.Context, req *GetAssistantFileRequ
 	}
 
 	r.Header.Add("Content-Type", "application/json")
-
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
 
 	if c.Organization != "" {
 		r.Header.Set("OpenAI-Organization", c.Organization)
 	}
-
-	r.Header.Set("OpenAI-Beta", "assistants=v1")
 
 	resp, err := c.HTTPClient.Do(r)
 	if err != nil {
@@ -2799,8 +2791,8 @@ func (c *Client) DeleteAssistantFile(ctx context.Context, req *DeleteAssistantFi
 	}
 
 	r.Header.Add("Content-Type", "application/json")
-
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
 
 	if c.Organization != "" {
 		r.Header.Set("OpenAI-Organization", c.Organization)
@@ -2863,10 +2855,12 @@ func (c *Client) ListAssistantFiles(ctx context.Context, req *ListAssistantFiles
 	}
 
 	r.Header.Add("Content-Type", "application/json")
-
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
-
 	r.Header.Set("OpenAI-Beta", "assistants=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
 
 	q := r.URL.Query()
 
@@ -2943,10 +2937,12 @@ func (c *Client) CreateThread(ctx context.Context, req *CreateThreadRequest) (*C
 	}
 
 	r.Header.Add("Content-Type", "application/json")
-
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
-
 	r.Header.Set("OpenAI-Beta", "threads=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
 
 	resp, err := c.HTTPClient.Do(r)
 	if err != nil {
@@ -2986,10 +2982,12 @@ func (c *Client) GetThread(ctx context.Context, req *GetThreadRequest) (*GetThre
 	}
 
 	r.Header.Add("Content-Type", "application/json")
-
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
-
 	r.Header.Set("OpenAI-Beta", "threads=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
 
 	resp, err := c.HTTPClient.Do(r)
 	if err != nil {
@@ -3038,10 +3036,12 @@ func (c *Client) UpdateThread(ctx context.Context, req *UpdateThreadRequest) (*U
 	}
 
 	r.Header.Add("Content-Type", "application/json")
-
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
-
 	r.Header.Set("OpenAI-Beta", "threads=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
 
 	resp, err := c.HTTPClient.Do(r)
 	if err != nil {
@@ -3079,10 +3079,12 @@ func (c *Client) DeleteThread(ctx context.Context, req *DeleteThreadRequest) err
 	}
 
 	r.Header.Add("Content-Type", "application/json")
-
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
-
 	r.Header.Set("OpenAI-Beta", "threads=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
 
 	resp, err := c.HTTPClient.Do(r)
 	if err != nil {
@@ -3155,10 +3157,12 @@ func (c *Client) CreateMessage(ctx context.Context, req *CreateMessageRequest) (
 	}
 
 	r.Header.Add("Content-Type", "application/json")
-
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
-
 	r.Header.Set("OpenAI-Beta", "threads=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
 
 	resp, err := c.HTTPClient.Do(r)
 	if err != nil {
@@ -3203,10 +3207,12 @@ func (c *Client) GetMessage(ctx context.Context, req *GetMessageRequest) (*GetMe
 	}
 
 	r.Header.Add("Content-Type", "application/json")
-
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
-
 	r.Header.Set("OpenAI-Beta", "threads=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
 
 	resp, err := c.HTTPClient.Do(r)
 	if err != nil {
@@ -3261,10 +3267,12 @@ func (c *Client) UpdateMessage(ctx context.Context, req *UpdateMessageRequest) (
 	}
 
 	r.Header.Add("Content-Type", "application/json")
-
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
-
 	r.Header.Set("OpenAI-Beta", "threads=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
 
 	resp, err := c.HTTPClient.Do(r)
 	if err != nil {
@@ -3326,10 +3334,12 @@ func (c *Client) ListMessages(ctx context.Context, req *ListMessagesRequest) (*L
 	}
 
 	r.Header.Add("Content-Type", "application/json")
-
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
-
 	r.Header.Set("OpenAI-Beta", "threads=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
 
 	q := r.URL.Query()
 
@@ -3407,10 +3417,12 @@ func (c *Client) GetMessageFile(ctx context.Context, req *GetMessageFileRequest)
 	}
 
 	r.Header.Add("Content-Type", "application/json")
-
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
-
 	r.Header.Set("OpenAI-Beta", "threads=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
 
 	resp, err := c.HTTPClient.Do(r)
 	if err != nil {
@@ -3477,10 +3489,12 @@ func (c *Client) ListMessageFiles(ctx context.Context, req *ListMessageFilesRequ
 	}
 
 	r.Header.Add("Content-Type", "application/json")
-
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
-
 	r.Header.Set("OpenAI-Beta", "threads=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
 
 	q := r.URL.Query()
 
@@ -3592,10 +3606,12 @@ func (c *Client) CreateRun(ctx context.Context, req *CreateRunRequest) (*CreateR
 	}
 
 	r.Header.Add("Content-Type", "application/json")
-
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
-
 	r.Header.Set("OpenAI-Beta", "runs=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
 
 	resp, err := c.HTTPClient.Do(r)
 	if err != nil {
@@ -3639,8 +3655,12 @@ func (c *Client) GetRun(ctx context.Context, req *GetRunRequest) (*GetRunRespons
 	}
 
 	r.Header.Add("Content-Type", "application/json")
-
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
 	r.Header.Set("OpenAI-Beta", "runs=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
 
 	resp, err := c.HTTPClient.Do(r)
 	if err != nil {
@@ -3694,8 +3714,12 @@ func (c *Client) UpdateRun(ctx context.Context, req *UpdateRunRequest) (*UpdateR
 	}
 
 	r.Header.Add("Content-Type", "application/json")
-
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
 	r.Header.Set("OpenAI-Beta", "runs=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
 
 	resp, err := c.HTTPClient.Do(r)
 	if err != nil {
@@ -3787,8 +3811,12 @@ func (c *Client) SubmitToolOutputs(ctx context.Context, req *SubmitToolOutputsRe
 	}
 
 	r.Header.Add("Content-Type", "application/json")
-
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
 	r.Header.Set("OpenAI-Beta", "runs=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
 
 	resp, err := c.HTTPClient.Do(r)
 	if err != nil {
@@ -3835,8 +3863,12 @@ func (c *Client) CancelRun(ctx context.Context, req *CancelRunRequest) error {
 	}
 
 	r.Header.Add("Content-Type", "application/json")
-
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
 	r.Header.Set("OpenAI-Beta", "runs=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
 
 	resp, err := c.HTTPClient.Do(r)
 	if err != nil {
@@ -3935,8 +3967,12 @@ func (c *Client) GetRunStep(ctx context.Context, req *GetRunStepRequest) (*GetRu
 	}
 
 	r.Header.Add("Content-Type", "application/json")
-
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
 	r.Header.Set("OpenAI-Beta", "runs=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
 
 	resp, err := c.HTTPClient.Do(r)
 	if err != nil {
@@ -4002,8 +4038,12 @@ func (c *Client) ListRunSteps(ctx context.Context, req *ListRunStepsRequest) (*L
 	}
 
 	r.Header.Add("Content-Type", "application/json")
-
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
 	r.Header.Set("OpenAI-Beta", "runs=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
 
 	q := r.URL.Query()
 
