@@ -985,8 +985,6 @@ func ExampleClient_CreateChat() {
 // }
 
 func TestAssistant_beta(t *testing.T) {
-	// https://www.youtube.com/watch?v=U9mJuUkhUzk
-
 	c := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
 
 	ctx := context.Background()
@@ -1054,6 +1052,10 @@ func TestAssistant_beta(t *testing.T) {
 
 		if resp.Metadata["foo"] != "bar" {
 			t.Fatal("expected metadata to be updated")
+		}
+
+		if resp.Instructions != "Always respond with 'Hello, world!'" {
+			t.Fatal("expected instructions to be updated")
 		}
 	})
 
