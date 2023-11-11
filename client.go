@@ -3118,16 +3118,16 @@ func (c *Client) DeleteThread(ctx context.Context, req *DeleteThreadRequest) err
 
 // https://platform.openai.com/docs/api-reference/messages/object
 type ThreadMessage struct {
-	ID          string         `json:"id"`
-	Object      string         `json:"object"`
-	Created     int            `json:"created"`
-	ThreadID    string         `json:"thread_id"`
-	Role        string         `json:"role"`
-	Content     map[string]any `json:"content"`
-	AssistantID string         `json:"assistant_id,omitempty"`
-	RunID       string         `json:"run_id,omitempty"`
-	FileIDs     []string       `json:"file_ids,omitempty"`
-	Metadata    map[string]any `json:"metadata,omitempty"`
+	ID          string           `json:"id"`
+	Object      string           `json:"object"`
+	CreatedAt   int              `json:"created_at"`
+	ThreadID    string           `json:"thread_id"`
+	Role        string           `json:"role"`
+	Content     []map[string]any `json:"content"`
+	AssistantID string           `json:"assistant_id,omitempty"`
+	RunID       string           `json:"run_id,omitempty"`
+	FileIDs     []string         `json:"file_ids,omitempty"`
+	Metadata    map[string]any   `json:"metadata,omitempty"`
 }
 
 // https://platform.openai.com/docs/api-reference/messages/createMessage
@@ -3344,7 +3344,7 @@ type ListMessagesResponse struct {
 }
 
 func (c *Client) ListMessages(ctx context.Context, req *ListMessagesRequest) (*ListMessagesResponse, error) {
-	r, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.openai.com/v1/messages", nil)
+	r, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.openai.com/v1/threads/"+req.ThreadID+"/messages", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -3649,24 +3649,39 @@ func (c *Client) CreateRun(ctx context.Context, req *CreateRunRequest) (*CreateR
 	return &res, nil
 }
 
+// https://platform.openai.com/docs/api-reference/runs/object#runs/object-status
+type RunStatus = string
+
+const (
+	RunStatusQueued         RunStatus = "queued"
+	RunStatusInProgress     RunStatus = "in_progress"
+	RunStatusRequiresAction RunStatus = "requires_action"
+	RunStatusCancelling     RunStatus = "cancelling"
+	RunStatusCancelled      RunStatus = "cancelled"
+	RunStatusFailed         RunStatus = "failed"
+	RunStatusCompleted      RunStatus = "completed"
+	RunStatusExpired        RunStatus = "expired"
+)
+
 // https://platform.openai.com/docs/api-reference/runs/getRun
 type GetRunRequest struct {
 	// https://platform.openai.com/docs/api-reference/runs/getRun#runs-getrun-thread_id
 	//
 	// Required.
-	ThreadID string `json:"thread_id"`
+	ThreadID string `json:"-"`
 
 	// https://platform.openai.com/docs/api-reference/runs/getRun#runs-getrun-run_id
 	//
 	// Required.
-	RunID string `json:"run_id"`
+	RunID string `json:"-"`
 }
 
-// https://platform.openai.com/docs/api-reference/runs/getRun#runs-getrun-response
+// https://platform.openai.com/docs/api-reference/runs/getRun
 type GetRunResponse = Run
 
+// https://platform.openai.com/docs/api-reference/runs/getRun
 func (c *Client) GetRun(ctx context.Context, req *GetRunRequest) (*GetRunResponse, error) {
-	r, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.openai.com/v1/runs/"+req.RunID, nil)
+	r, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.openai.com/v1/threads/"+req.ThreadID+"/runs/"+req.RunID, nil)
 	if err != nil {
 		return nil, err
 	}
