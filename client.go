@@ -3556,12 +3556,12 @@ func (c *Client) ListMessageFiles(ctx context.Context, req *ListMessageFilesRequ
 type Run struct {
 	ID             string           `json:"id"`
 	Object         string           `json:"object"`
-	Created        int              `json:"created"`
+	CreatedAt      int              `json:"created_at"`
 	ThreadID       string           `json:"thread_id"`
 	AssistantID    string           `json:"assistant_id"`
 	Status         string           `json:"status"`
 	RequiredAction string           `json:"required_action,omitempty"`
-	LastError      string           `json:"last_error,omitempty"`
+	LastError      map[string]any   `json:"last_error,omitempty"`
 	ExpiresAt      int              `json:"expires_at"`
 	StartedAt      int              `json:"started_at,omitempty"`
 	CancelledAt    int              `json:"cancelled_at,omitempty"`
