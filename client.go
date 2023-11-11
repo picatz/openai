@@ -2323,25 +2323,40 @@ func (c *Client) CreateAudioTranscription(ctx context.Context, req *CreateAudioT
 
 // https://platform.openai.com/docs/api-reference/assistants/create
 type CreateAssistantRequest struct {
-	// https://platform.openai.com/docs/api-reference/assistants/create#assistants/create-instructions
-	//
-	// Required.
-	Instructions string `json:"instructions"`
-
-	// https://platform.openai.com/docs/api-reference/assistants/create#assistants/create-name
-	//
-	// Required.
-	Name string `json:"name"`
-
-	// https://platform.openai.com/docs/api-reference/assistants/create#assistants/create-tools
-	//
-	// Required.
-	Tools []map[string]any `json:"tools"`
-
-	// https://platform.openai.com/docs/api-reference/assistants/create#assistants/create-model
+	// https://platform.openai.com/docs/api-reference/assistants/createAssistant#assistants-createassistant-model
 	//
 	// Required.
 	Model string `json:"model"`
+
+	// https://platform.openai.com/docs/api-reference/assistants/createAssistant#assistants-createassistant-instructions
+	//
+	// Optional.
+	Instructions string `json:"instructions,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/assistants/createAssistant#assistants-createassistant-name
+	//
+	// Optional.
+	Name string `json:"name,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/assistants/createAssistant#assistants-createassistant-description
+	//
+	// Optional.
+	Description string `json:"description,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/assistants/createAssistant#assistants-createassistant-tools
+	//
+	// Optional.
+	Tools []map[string]any `json:"tools,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/assistants/createAssistant#assistants-createassistant-file_ids
+	//
+	// Optional.
+	FileIDs []string `json:"file_ids,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/assistants/createAssistant#assistants-createassistant-metadata
+	//
+	// Optional.
+	Metadata map[string]any `json:"metadata,omitempty"`
 }
 
 // https://platform.openai.com/docs/api-reference/assistants/object
@@ -2922,9 +2937,10 @@ type CreateThreadRequest struct {
 	Metadata map[string]any `json:"metadata,omitempty"`
 }
 
-// https://platform.openai.com/docs/api-reference/threads/createThread#threads-createthread-response
+// https://platform.openai.com/docs/api-reference/threads/createThread
 type CreateThreadResponse = Thread
 
+// https://platform.openai.com/docs/api-reference/threads/createThread
 func (c *Client) CreateThread(ctx context.Context, req *CreateThreadRequest) (*CreateThreadResponse, error) {
 	b, err := json.Marshal(req)
 	if err != nil {
@@ -2938,7 +2954,7 @@ func (c *Client) CreateThread(ctx context.Context, req *CreateThreadRequest) (*C
 
 	r.Header.Add("Content-Type", "application/json")
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
-	r.Header.Set("OpenAI-Beta", "threads=v1")
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
 
 	if c.Organization != "" {
 		r.Header.Set("OpenAI-Organization", c.Organization)
@@ -2949,7 +2965,7 @@ func (c *Client) CreateThread(ctx context.Context, req *CreateThreadRequest) (*C
 		return nil, err
 	}
 
-	if resp.StatusCode != http.StatusCreated {
+	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		defer resp.Body.Close()
 		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
@@ -2983,7 +2999,7 @@ func (c *Client) GetThread(ctx context.Context, req *GetThreadRequest) (*GetThre
 
 	r.Header.Add("Content-Type", "application/json")
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
-	r.Header.Set("OpenAI-Beta", "threads=v1")
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
 
 	if c.Organization != "" {
 		r.Header.Set("OpenAI-Organization", c.Organization)
@@ -2994,7 +3010,7 @@ func (c *Client) GetThread(ctx context.Context, req *GetThreadRequest) (*GetThre
 		return nil, err
 	}
 
-	if resp.StatusCode != http.StatusCreated {
+	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		defer resp.Body.Close()
 		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
@@ -3037,7 +3053,7 @@ func (c *Client) UpdateThread(ctx context.Context, req *UpdateThreadRequest) (*U
 
 	r.Header.Add("Content-Type", "application/json")
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
-	r.Header.Set("OpenAI-Beta", "threads=v1")
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
 
 	if c.Organization != "" {
 		r.Header.Set("OpenAI-Organization", c.Organization)
@@ -3048,7 +3064,7 @@ func (c *Client) UpdateThread(ctx context.Context, req *UpdateThreadRequest) (*U
 		return nil, err
 	}
 
-	if resp.StatusCode != http.StatusCreated {
+	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		defer resp.Body.Close()
 		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
@@ -3080,7 +3096,7 @@ func (c *Client) DeleteThread(ctx context.Context, req *DeleteThreadRequest) err
 
 	r.Header.Add("Content-Type", "application/json")
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
-	r.Header.Set("OpenAI-Beta", "threads=v1")
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
 
 	if c.Organization != "" {
 		r.Header.Set("OpenAI-Organization", c.Organization)
@@ -3158,7 +3174,7 @@ func (c *Client) CreateMessage(ctx context.Context, req *CreateMessageRequest) (
 
 	r.Header.Add("Content-Type", "application/json")
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
-	r.Header.Set("OpenAI-Beta", "threads=v1")
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
 
 	if c.Organization != "" {
 		r.Header.Set("OpenAI-Organization", c.Organization)
@@ -3169,7 +3185,7 @@ func (c *Client) CreateMessage(ctx context.Context, req *CreateMessageRequest) (
 		return nil, err
 	}
 
-	if resp.StatusCode != http.StatusCreated {
+	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		defer resp.Body.Close()
 		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
@@ -3208,7 +3224,7 @@ func (c *Client) GetMessage(ctx context.Context, req *GetMessageRequest) (*GetMe
 
 	r.Header.Add("Content-Type", "application/json")
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
-	r.Header.Set("OpenAI-Beta", "threads=v1")
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
 
 	if c.Organization != "" {
 		r.Header.Set("OpenAI-Organization", c.Organization)
@@ -3219,7 +3235,7 @@ func (c *Client) GetMessage(ctx context.Context, req *GetMessageRequest) (*GetMe
 		return nil, err
 	}
 
-	if resp.StatusCode != http.StatusCreated {
+	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		defer resp.Body.Close()
 		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
@@ -3268,7 +3284,7 @@ func (c *Client) UpdateMessage(ctx context.Context, req *UpdateMessageRequest) (
 
 	r.Header.Add("Content-Type", "application/json")
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
-	r.Header.Set("OpenAI-Beta", "threads=v1")
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
 
 	if c.Organization != "" {
 		r.Header.Set("OpenAI-Organization", c.Organization)
@@ -3279,7 +3295,7 @@ func (c *Client) UpdateMessage(ctx context.Context, req *UpdateMessageRequest) (
 		return nil, err
 	}
 
-	if resp.StatusCode != http.StatusCreated {
+	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		defer resp.Body.Close()
 		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
@@ -3335,7 +3351,7 @@ func (c *Client) ListMessages(ctx context.Context, req *ListMessagesRequest) (*L
 
 	r.Header.Add("Content-Type", "application/json")
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
-	r.Header.Set("OpenAI-Beta", "threads=v1")
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
 
 	if c.Organization != "" {
 		r.Header.Set("OpenAI-Organization", c.Organization)
@@ -3366,7 +3382,7 @@ func (c *Client) ListMessages(ctx context.Context, req *ListMessagesRequest) (*L
 		return nil, err
 	}
 
-	if resp.StatusCode != http.StatusCreated {
+	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		defer resp.Body.Close()
 		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
@@ -3418,7 +3434,7 @@ func (c *Client) GetMessageFile(ctx context.Context, req *GetMessageFileRequest)
 
 	r.Header.Add("Content-Type", "application/json")
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
-	r.Header.Set("OpenAI-Beta", "threads=v1")
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
 
 	if c.Organization != "" {
 		r.Header.Set("OpenAI-Organization", c.Organization)
@@ -3429,7 +3445,7 @@ func (c *Client) GetMessageFile(ctx context.Context, req *GetMessageFileRequest)
 		return nil, err
 	}
 
-	if resp.StatusCode != http.StatusCreated {
+	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		defer resp.Body.Close()
 		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
@@ -3490,7 +3506,7 @@ func (c *Client) ListMessageFiles(ctx context.Context, req *ListMessageFilesRequ
 
 	r.Header.Add("Content-Type", "application/json")
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
-	r.Header.Set("OpenAI-Beta", "threads=v1")
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
 
 	if c.Organization != "" {
 		r.Header.Set("OpenAI-Organization", c.Organization)
@@ -3521,7 +3537,7 @@ func (c *Client) ListMessageFiles(ctx context.Context, req *ListMessageFilesRequ
 		return nil, err
 	}
 
-	if resp.StatusCode != http.StatusCreated {
+	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		defer resp.Body.Close()
 		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
@@ -3563,7 +3579,7 @@ type CreateRunRequest struct {
 	// https://platform.openai.com/docs/api-reference/runs/createRun#runs-createrun-thread_id
 	//
 	// Required.
-	ThreadID string `json:"thread_id"`
+	ThreadID string `json:"-"`
 
 	// https://platform.openai.com/docs/api-reference/runs/createRun#runs-createrun-assistant_id
 	//
@@ -3591,23 +3607,24 @@ type CreateRunRequest struct {
 	Metadata map[string]any `json:"metadata,omitempty"`
 }
 
-// https://platform.openai.com/docs/api-reference/runs/createRun#runs-createrun-response
+// https://platform.openai.com/docs/api-reference/runs/createRun
 type CreateRunResponse = Run
 
+// https://platform.openai.com/docs/api-reference/runs/createRun
 func (c *Client) CreateRun(ctx context.Context, req *CreateRunRequest) (*CreateRunResponse, error) {
 	b, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
 	}
 
-	r, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/runs", bytes.NewReader(b))
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/threads/"+req.ThreadID+"/runs", bytes.NewReader(b))
 	if err != nil {
 		return nil, err
 	}
 
 	r.Header.Add("Content-Type", "application/json")
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
-	r.Header.Set("OpenAI-Beta", "runs=v1")
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
 
 	if c.Organization != "" {
 		r.Header.Set("OpenAI-Organization", c.Organization)
@@ -3618,7 +3635,7 @@ func (c *Client) CreateRun(ctx context.Context, req *CreateRunRequest) (*CreateR
 		return nil, err
 	}
 
-	if resp.StatusCode != http.StatusCreated {
+	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		defer resp.Body.Close()
 		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
@@ -3656,7 +3673,7 @@ func (c *Client) GetRun(ctx context.Context, req *GetRunRequest) (*GetRunRespons
 
 	r.Header.Add("Content-Type", "application/json")
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
-	r.Header.Set("OpenAI-Beta", "runs=v1")
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
 
 	if c.Organization != "" {
 		r.Header.Set("OpenAI-Organization", c.Organization)
@@ -3667,7 +3684,7 @@ func (c *Client) GetRun(ctx context.Context, req *GetRunRequest) (*GetRunRespons
 		return nil, err
 	}
 
-	if resp.StatusCode != http.StatusCreated {
+	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		defer resp.Body.Close()
 		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
@@ -3715,7 +3732,7 @@ func (c *Client) UpdateRun(ctx context.Context, req *UpdateRunRequest) (*UpdateR
 
 	r.Header.Add("Content-Type", "application/json")
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
-	r.Header.Set("OpenAI-Beta", "runs=v1")
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
 
 	if c.Organization != "" {
 		r.Header.Set("OpenAI-Organization", c.Organization)
@@ -3726,7 +3743,7 @@ func (c *Client) UpdateRun(ctx context.Context, req *UpdateRunRequest) (*UpdateR
 		return nil, err
 	}
 
-	if resp.StatusCode != http.StatusCreated {
+	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		defer resp.Body.Close()
 		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
@@ -3812,7 +3829,7 @@ func (c *Client) SubmitToolOutputs(ctx context.Context, req *SubmitToolOutputsRe
 
 	r.Header.Add("Content-Type", "application/json")
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
-	r.Header.Set("OpenAI-Beta", "runs=v1")
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
 
 	if c.Organization != "" {
 		r.Header.Set("OpenAI-Organization", c.Organization)
@@ -3823,7 +3840,7 @@ func (c *Client) SubmitToolOutputs(ctx context.Context, req *SubmitToolOutputsRe
 		return nil, err
 	}
 
-	if resp.StatusCode != http.StatusCreated {
+	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		defer resp.Body.Close()
 		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
@@ -3864,7 +3881,7 @@ func (c *Client) CancelRun(ctx context.Context, req *CancelRunRequest) error {
 
 	r.Header.Add("Content-Type", "application/json")
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
-	r.Header.Set("OpenAI-Beta", "runs=v1")
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
 
 	if c.Organization != "" {
 		r.Header.Set("OpenAI-Organization", c.Organization)
@@ -3968,7 +3985,7 @@ func (c *Client) GetRunStep(ctx context.Context, req *GetRunStepRequest) (*GetRu
 
 	r.Header.Add("Content-Type", "application/json")
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
-	r.Header.Set("OpenAI-Beta", "runs=v1")
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
 
 	if c.Organization != "" {
 		r.Header.Set("OpenAI-Organization", c.Organization)
@@ -4039,7 +4056,7 @@ func (c *Client) ListRunSteps(ctx context.Context, req *ListRunStepsRequest) (*L
 
 	r.Header.Add("Content-Type", "application/json")
 	r.Header.Add("Authorization", "Bearer "+c.APIKey)
-	r.Header.Set("OpenAI-Beta", "runs=v1")
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
 
 	if c.Organization != "" {
 		r.Header.Set("OpenAI-Organization", c.Organization)
