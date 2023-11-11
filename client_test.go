@@ -997,7 +997,6 @@ func TestAssistant_beta(t *testing.T) {
 			Name:         "Test Assistant",
 			Instructions: "You are a helpful assistant.",
 			Model:        openai.ModelGPT41106Previw,
-			// Model: openai.ModelGPT35Turbo1106,
 			Tools: []map[string]any{
 				{
 					"type": "code_interpreter",
