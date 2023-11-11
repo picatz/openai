@@ -997,6 +997,7 @@ func TestAssistant_beta(t *testing.T) {
 			Name:         "Test Assistant",
 			Instructions: "You are a helpful assistant.",
 			Model:        openai.ModelGPT41106Previw,
+			// Model: openai.ModelGPT35Turbo1106,
 			Tools: []map[string]any{
 				{
 					"type": "code_interpreter",
@@ -1056,6 +1057,85 @@ func TestAssistant_beta(t *testing.T) {
 
 		if resp.Instructions != "Always respond with 'Hello, world!'" {
 			t.Fatal("expected instructions to be updated")
+		}
+	})
+
+	t.Run("talk to it", func(t *testing.T) {
+		threadResp, err := c.CreateThread(ctx, &openai.CreateThreadRequest{
+			Messages: []*openai.ChatMessage{
+				{
+					Role:    openai.ChatRoleUser,
+					Content: "Hello, world!",
+				},
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if threadResp.ID == "" {
+			t.Fatal("expected thread ID to be non-empty")
+		}
+
+		runResp, err := c.CreateRun(ctx, &openai.CreateRunRequest{
+			ThreadID:    threadResp.ID,
+			AssistantID: assistant.ID,
+			Model:       openai.ModelGPT41106Previw,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if runResp.ID == "" {
+			t.Fatal("expected run ID to be non-empty")
+		}
+
+		// Wait for the run to finish
+		var ranResp *openai.Run
+		for {
+			t.Log("waiting for run to complete...")
+			time.Sleep(1 * time.Second)
+
+			ranResp, err = c.GetRun(ctx, &openai.GetRunRequest{
+				ThreadID: threadResp.ID,
+				RunID:    runResp.ID,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			var done bool
+
+			switch ranResp.Status {
+			case openai.RunStatusCompleted:
+				done = true
+			case openai.RunStatusQueued:
+				continue
+			default:
+				t.Fatalf("unexpected run status: %q", ranResp.Status)
+			}
+
+			if done {
+				break
+			}
+		}
+
+		// List messages in the thread
+		listMsgsResp, err := c.ListMessages(ctx, &openai.ListMessagesRequest{
+			ThreadID: threadResp.ID,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if len(listMsgsResp.Data) != 2 {
+			t.Fatalf("expected 2 messages, got %d", len(listMsgsResp.Data))
+		}
+
+		for _, msg := range listMsgsResp.Data {
+			for _, content := range msg.Content {
+				t.Logf("message %s text: %#+v", msg.ID, content)
+			}
 		}
 	})
 
