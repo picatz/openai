@@ -2482,7 +2482,7 @@ type UpdateAssistantRequest struct {
 	// https://platform.openai.com/docs/api-reference/assistants/modifyAssistant#assistants-modifyassistant-model
 	//
 	// Optional.
-	Model string `json:"-"`
+	Model string `json:"model,omitempty"`
 
 	// https://platform.openai.com/docs/api-reference/assistants/modifyAssistant#assistants-modifyassistant-name
 	//
@@ -3815,12 +3815,12 @@ type SubmitToolOutputsRequest struct {
 	// https://platform.openai.com/docs/api-reference/runs/submitToolOutputs#runs-submittooloutputs-thread_id
 	//
 	// Required.
-	ThreadID string `json:"thread_id"`
+	ThreadID string `json:"-"`
 
 	// https://platform.openai.com/docs/api-reference/runs/submitToolOutputs#runs-submittooloutputs-run_id
 	//
 	// Required.
-	RunID string `json:"run_id"`
+	RunID string `json:"-"`
 
 	// https://platform.openai.com/docs/api-reference/runs/submitToolOutputs#runs-submittooloutputs-tool_id
 	//
