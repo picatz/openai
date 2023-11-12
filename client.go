@@ -3135,7 +3135,7 @@ type CreateMessageRequest struct {
 	// https://platform.openai.com/docs/api-reference/messages/createMessage#messages-createmessage-thread_id
 	//
 	// Required.
-	ThreadID string `json:"thread_id"`
+	ThreadID string `json:"-"`
 
 	// https://platform.openai.com/docs/api-reference/messages/createMessage#messages-createmessage-role
 	//
@@ -3158,16 +3158,17 @@ type CreateMessageRequest struct {
 	Metadata map[string]any `json:"metadata,omitempty"`
 }
 
-// https://platform.openai.com/docs/api-reference/messages/createMessage#messages-createmessage-response
+// https://platform.openai.com/docs/api-reference/messages/createMessage
 type CreateMessageResponse = ThreadMessage
 
+// https://platform.openai.com/docs/api-reference/messages/createMessage
 func (c *Client) CreateMessage(ctx context.Context, req *CreateMessageRequest) (*CreateMessageResponse, error) {
 	b, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
 	}
 
-	r, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/messages", bytes.NewReader(b))
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/threads/"+req.ThreadID+"/messages", bytes.NewReader(b))
 	if err != nil {
 		return nil, err
 	}
@@ -3913,9 +3914,17 @@ func (c *Client) CancelRun(ctx context.Context, req *CancelRunRequest) error {
 	return nil
 }
 
+// https://platform.openai.com/docs/api-reference/runs/createThreadAndRun#runs-createthreadandrun-thread
+type CreateThreadAndRunRequestInitialThreadMessage struct {
+	Role     string         `json:"role"`
+	Content  string         `json:"content"`
+	FilesIDs []string       `json:"file_ids,omitempty"`
+	Metadata map[string]any `json:"metadata,omitempty"`
+}
+
 type CreateThreadAndRunRequestInitialThread struct {
-	Messages []*ThreadMessage `json:"messages,omitempty"`
-	Metadata map[string]any   `json:"metadata,omitempty"`
+	Messages []*CreateThreadAndRunRequestInitialThreadMessage `json:"messages,omitempty"`
+	Metadata map[string]any                                   `json:"metadata,omitempty"`
 }
 
 // https://platform.openai.com/docs/api-reference/runs/createThreadAndRun
@@ -3949,6 +3958,44 @@ type CreateThreadAndRunRequest struct {
 	//
 	// Optional.
 	Metadata map[string]any `json:"metadata,omitempty"`
+}
+
+// https://platform.openai.com/docs/api-reference/runs/createThreadAndRun
+type CreateThreadAndRunResponse = Run
+
+// https://platform.openai.com/docs/api-reference/runs/createThreadAndRun
+func (c *Client) CreateThreadAndRun(ctx context.Context, req *CreateThreadAndRunRequest) (*CreateThreadAndRunResponse, error) {
+	b, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/threads/runs", bytes.NewReader(b))
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+
+	var res CreateThreadAndRunResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &res, nil
 }
 
 // https://platform.openai.com/docs/api-reference/runs/step-object
