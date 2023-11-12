@@ -1119,6 +1119,30 @@ func TestAssistant_beta(t *testing.T) {
 			}
 		}
 
+		// List run steps
+		listStepsResp, err := c.ListRunSteps(ctx, &openai.ListRunStepsRequest{
+			ThreadID: threadResp.ID,
+			RunID:    runResp.ID,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for _, step := range listStepsResp.Data {
+			t.Logf("step: %#+v", step)
+
+			step, err := c.GetRunStep(ctx, &openai.GetRunStepRequest{
+				ThreadID: threadResp.ID,
+				RunID:    runResp.ID,
+				StepID:   step.ID,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			t.Logf("step: %#+v", step)
+		}
+
 		// List messages in the thread
 		listMsgsResp, err := c.ListMessages(ctx, &openai.ListMessagesRequest{
 			ThreadID: threadResp.ID,
