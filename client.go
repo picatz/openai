@@ -2834,7 +2834,7 @@ type ListAssistantFilesRequest struct {
 	// https://platform.openai.com/docs/api-reference/assistants/listAssistantFiles#assistants-listassistantfiles-assistant_id
 	//
 	// Required.
-	AssistantID string `json:"assistant_id"`
+	AssistantID string `json:"-"`
 
 	// https://platform.openai.com/docs/api-reference/assistants/listAssistantFiles#assistants-listassistantfiles-limit
 	//
@@ -3668,12 +3668,12 @@ type GetRunRequest struct {
 	// https://platform.openai.com/docs/api-reference/runs/getRun#runs-getrun-thread_id
 	//
 	// Required.
-	ThreadID string `json:"-"`
+	ThreadID string
 
 	// https://platform.openai.com/docs/api-reference/runs/getRun#runs-getrun-run_id
 	//
 	// Required.
-	RunID string `json:"-"`
+	RunID string
 }
 
 // https://platform.openai.com/docs/api-reference/runs/getRun
@@ -3718,12 +3718,12 @@ type UpdateRunRequest struct {
 	// https://platform.openai.com/docs/api-reference/runs/modifyRun#runs-modifyrun-thread_id
 	//
 	// Required.
-	ThreadID string `json:"thread_id"`
+	ThreadID string `json:"-"`
 
 	// https://platform.openai.com/docs/api-reference/runs/modifyRun#runs-modifyrun-run_id
 	//
 	// Required.
-	RunID string `json:"run_id"`
+	RunID string `json:"-"`
 
 	// https://platform.openai.com/docs/api-reference/runs/modifyRun#runs-modifyrun-metadata
 	//
@@ -3731,16 +3731,17 @@ type UpdateRunRequest struct {
 	Metadata map[string]any `json:"metadata,omitempty"`
 }
 
-// https://platform.openai.com/docs/api-reference/runs/modifyRun#runs-modifyrun-response
+// https://platform.openai.com/docs/api-reference/runs/modifyRun
 type UpdateRunResponse = Run
 
+// https://platform.openai.com/docs/api-reference/runs/modifyRun
 func (c *Client) UpdateRun(ctx context.Context, req *UpdateRunRequest) (*UpdateRunResponse, error) {
 	b, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
 	}
 
-	r, err := http.NewRequestWithContext(ctx, http.MethodPatch, "https://api.openai.com/v1/runs/"+req.RunID, bytes.NewReader(b))
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/threads/"+req.ThreadID+"/runs/"+req.RunID, bytes.NewReader(b))
 	if err != nil {
 		return nil, err
 	}
@@ -3828,16 +3829,17 @@ type SubmitToolOutputsRequest struct {
 	ToolOuputs []*AssistantToolOutput `json:"tool_outputs"`
 }
 
-// https://platform.openai.com/docs/api-reference/runs/submitToolOutputs#runs-submittooloutputs-response
+// https://platform.openai.com/docs/api-reference/runs/submitToolOutputs
 type SubmitToolOutputsResponse = Run
 
+// https://platform.openai.com/docs/api-reference/runs/submitToolOutputs
 func (c *Client) SubmitToolOutputs(ctx context.Context, req *SubmitToolOutputsRequest) (*SubmitToolOutputsResponse, error) {
 	b, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
 	}
 
-	r, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/runs/"+req.RunID+"/submit", bytes.NewReader(b))
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/threads/"+req.ThreadID+"/runs/"+req.RunID+"/submit_tool_outputs", bytes.NewReader(b))
 	if err != nil {
 		return nil, err
 	}
@@ -3874,22 +3876,17 @@ type CancelRunRequest struct {
 	// https://platform.openai.com/docs/api-reference/runs/cancelRun#runs-cancelrun-thread_id
 	//
 	// Required.
-	ThreadID string `json:"thread_id"`
+	ThreadID string
 
 	// https://platform.openai.com/docs/api-reference/runs/cancelRun#runs-cancelrun-run_id
 	//
 	// Required.
-	RunID string `json:"run_id"`
+	RunID string
 }
 
 // https://platform.openai.com/docs/api-reference/runs/cancelRun
 func (c *Client) CancelRun(ctx context.Context, req *CancelRunRequest) error {
-	b, err := json.Marshal(req)
-	if err != nil {
-		return err
-	}
-
-	r, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/runs/"+req.RunID+"/cancel", bytes.NewReader(b))
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/threads/"+req.ThreadID+"/runs/"+req.RunID+"/cancel", nil)
 	if err != nil {
 		return err
 	}
@@ -3916,6 +3913,11 @@ func (c *Client) CancelRun(ctx context.Context, req *CancelRunRequest) error {
 	return nil
 }
 
+type CreateThreadAndRunRequestInitialThread struct {
+	Messages []*ThreadMessage `json:"messages,omitempty"`
+	Metadata map[string]any   `json:"metadata,omitempty"`
+}
+
 // https://platform.openai.com/docs/api-reference/runs/createThreadAndRun
 type CreateThreadAndRunRequest struct {
 	// https://platform.openai.com/docs/api-reference/runs/createThreadAndRun#runs-createthreadandrun-assistant_id
@@ -3925,11 +3927,8 @@ type CreateThreadAndRunRequest struct {
 
 	// https://platform.openai.com/docs/api-reference/runs/createThreadAndRun#runs-createthreadandrun-thread
 	//
-	// Required.
-	Thread *struct {
-		Messages []*ThreadMessage `json:"messages,omitempty"`
-		Metadata map[string]any   `json:"metadata,omitempty"`
-	} `json:"thread,omitempty"`
+	// Optional.
+	Thread *CreateThreadAndRunRequestInitialThread `json:"thread,omitempty"`
 
 	// https://platform.openai.com/docs/api-reference/runs/createThreadAndRun#runs-createthreadandrun-model
 	//
@@ -3976,24 +3975,25 @@ type GetRunStepRequest struct {
 	// https://platform.openai.com/docs/api-reference/runs/getRunStep#runs-getrunstep-thread_id
 	//
 	// Required.
-	ThreadID string `json:"thread_id"`
+	ThreadID string
 
 	// https://platform.openai.com/docs/api-reference/runs/getRunStep#runs-getrunstep-run_id
 	//
 	// Required.
-	RunID string `json:"run_id"`
+	RunID string
 
 	// https://platform.openai.com/docs/api-reference/runs/getRunStep#runs-getrunstep-step_id
 	//
 	// Required.
-	StepID string `json:"step_id"`
+	StepID string
 }
 
-// https://platform.openai.com/docs/api-reference/runs/getRunStep#runs-getrunstep-response
+// https://platform.openai.com/docs/api-reference/runs/getRunStep
 type GetRunStepResponse = RunStep
 
+// https://platform.openai.com/docs/api-reference/runs/getRunStep
 func (c *Client) GetRunStep(ctx context.Context, req *GetRunStepRequest) (*GetRunStepResponse, error) {
-	r, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.openai.com/v1/runs/"+req.RunID+"/steps/"+req.StepID, nil)
+	r, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.openai.com/v1/threads/"+req.ThreadID+"/runs/"+req.RunID+"/steps/"+req.StepID, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -4030,41 +4030,42 @@ type ListRunStepsRequest struct {
 	// https://platform.openai.com/docs/api-reference/runs/listRunSteps#runs-listrunsteps-thread_id
 	//
 	// Required.
-	ThreadID string `json:"thread_id"`
+	ThreadID string
 
 	// https://platform.openai.com/docs/api-reference/runs/listRunSteps#runs-listrunsteps-run_id
 	//
 	// Required.
-	RunID string `json:"run_id"`
+	RunID string
 
 	// https://platform.openai.com/docs/api-reference/runs/listRunSteps#runs-listrunsteps-limit
 	//
 	// Optional. Defaults to 20.
-	Limit int `json:"limit,omitempty"`
+	Limit int
 
 	// https://platform.openai.com/docs/api-reference/runs/listRunSteps#runs-listrunsteps-order
 	//
 	// Optional. Defaults to "desc".
-	Order string `json:"order,omitempty"`
+	Order string
 
 	// https://platform.openai.com/docs/api-reference/runs/listRunSteps#runs-listrunsteps-after
 	//
 	// Optional.
-	After string `json:"after,omitempty"`
+	After string
 
 	// https://platform.openai.com/docs/api-reference/runs/listRunSteps#runs-listrunsteps-before
 	//
 	// Optional.
-	Before string `json:"before,omitempty"`
+	Before string
 }
 
-// https://platform.openai.com/docs/api-reference/runs/listRunSteps#runs-listrunsteps-response
+// https://platform.openai.com/docs/api-reference/runs/listRunSteps
 type ListRunStepsResponse struct {
 	Data []RunStep `json:"data"`
 }
 
+// https://platform.openai.com/docs/api-reference/runs/listRunSteps
 func (c *Client) ListRunSteps(ctx context.Context, req *ListRunStepsRequest) (*ListRunStepsResponse, error) {
-	r, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.openai.com/v1/runs/"+req.RunID+"/steps", nil)
+	r, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.openai.com/v1/threads/"+req.ThreadID+"/runs/"+req.RunID+"/steps", nil)
 	if err != nil {
 		return nil, err
 	}
