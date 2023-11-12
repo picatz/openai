@@ -76,15 +76,22 @@ func writeClipboard(s string) error {
 //  ...
 //  > Whatever you want to say to the AI
 //  ...
+//
+// # Assistant Mode
+//
+//  This mode will start an interactive chat session with the OpenAI API on the command line. It can
+//  be used similar to ChatGPT's web interface, but on the command line. It is an advanced version of
+//  chat mode with more features.
 
 // Mode of operation.
 type Mode string
 
 // Modes of operation.
 const (
-	ModeEdit     Mode = "edit"
-	ModeComplete Mode = "complete"
-	ModeChat     Mode = "chat"
+	ModeEdit      Mode = "edit"
+	ModeComplete  Mode = "complete"
+	ModeChat      Mode = "chat"
+	ModeAssistant Mode = "assistant"
 )
 
 func main() {
@@ -127,6 +134,8 @@ func main() {
 	// Check if the user wants to start a chat session.
 	if len(args) == 1 && args[0] == "chat" {
 		mode = ModeChat
+	} else if len(args) == 1 && args[0] == "assistant" {
+		mode = ModeAssistant
 	} else if fi.Mode()&os.ModeCharDevice == 0 {
 		mode = ModeEdit
 	} else {
@@ -143,6 +152,8 @@ func main() {
 	switch mode {
 	case ModeChat:
 		startChat(client, model)
+	case ModeAssistant:
+		startAssistantChat(client, model)
 	case ModeEdit:
 		// Read up to 4096 characters from STDIN.
 		b := make([]byte, 4096)
@@ -414,7 +425,7 @@ func startChat(client *openai.Client, model string) {
 		}
 
 		// Print the output using markdown-friendly terminal rendering.
-		s, err := renderMarkdown(strings.TrimRight(resp.Choices[0].Message.Content, "\n"))
+		s, err := renderMarkdown(strings.TrimRight(resp.Choices[0].Message.Content, "\n"), termWidth)
 		if err != nil {
 			bt.WriteString(err.Error())
 			bt.Flush()
@@ -485,10 +496,10 @@ func startChat(client *openai.Client, model string) {
 	}
 }
 
-func renderMarkdown(s string) (string, error) {
+func renderMarkdown(s string, width int) (string, error) {
 	r, err := glamour.NewTermRenderer(
 		glamour.WithStylePath("dark"),
-		glamour.WithWordWrap(80),
+		glamour.WithWordWrap(width),
 		glamour.WithPreservedNewLines(),
 	)
 	if err != nil {
@@ -593,4 +604,221 @@ func summarizeMessages(client *openai.Client, model string, messages []openai.Ch
 	}
 
 	return resp.Choices[0].Message.Content, resp.Usage.TotalTokens
+}
+
+func startAssistantChat(client *openai.Client, model string) {
+	ctx := context.Background()
+
+	assistant, err := client.CreateAssistant(ctx, &openai.CreateAssistantRequest{
+		Model:        openai.ModelGPT41106Previw, // TODO: use given model
+		Instructions: "You are a helpful assistant for all kinds of tasks. Answer as concisely as possible.",
+		Name:         "openai-cli-assistant",
+		Description:  "A helpful assistant for all kinds of tasks.",
+		Tools: []map[string]any{
+			{
+				"type": "code_interpreter",
+			},
+			{
+				"type": "retrieval",
+			},
+			// {
+			// 	"type": "function",
+			// },
+		},
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	defer func() {
+		err := client.DeleteAssistant(ctx, &openai.DeleteAssistantRequest{
+			ID: assistant.ID,
+		})
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	thread, err := client.CreateThread(ctx, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	defer func() {
+		err := client.DeleteThread(ctx, &openai.DeleteThreadRequest{
+			ID: thread.ID,
+		})
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	// Set the terminal to raw mode.
+	oldState, err := term.MakeRaw(0)
+	if err != nil {
+		panic(err)
+	}
+	defer term.Restore(0, oldState)
+
+	termWidth, termHeight, err := term.GetSize(0)
+	if err != nil {
+		panic(err)
+	}
+
+	termReadWriter := struct {
+		io.Reader
+		io.Writer
+	}{os.Stdin, os.Stdout}
+
+	t := term.NewTerminal(termReadWriter, "") // Will set the prompt later.
+
+	t.SetSize(termWidth, termHeight)
+
+	// Use buffered output so we can write to the terminal without
+	// having to wait for a newline, and so we can clear the screen
+	// and move the cursor around without having to worry about
+	// overwriting the prompt.
+	bt := bufio.NewWriter(t)
+
+	cls := func() {
+		// Clear the screen.
+		bt.WriteString("\033[2J")
+
+		// Move to the top left.
+		bt.WriteString("\033[H")
+
+		// Flush the buffer to the terminal.
+		bt.Flush()
+	}
+
+	cls()
+
+	// Print a welcome message to explain how to use the chat mode.
+	// t.Write([]byte("Welcome to the OpenAI API CLI chat mode. Type '\033[2mdelete\033[0m' to forget last message. Type '\033[2mexit\033[0m' to quit.\n\n"))
+
+	// Autocomplete for commands.
+	t.AutoCompleteCallback = func(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
+		// If the user presses tab, then autocomplete the command.
+		if key == '\t' {
+			for _, cmd := range []string{"exit", "clear", "delete", "copy", "erase", "system:", "<clipboard>"} {
+				if strings.HasPrefix(cmd, line) {
+					// Autocomplete the command.
+					// t.Write([]byte(cmd[len(line):]))
+
+					// Return the new line and position, which must come after the
+					// command.
+					return cmd, len(cmd), true
+				}
+			}
+		}
+
+		// If the user hit backspace on the example system message, then we'll
+		// just delete the whole line, re-add the "system:" prefix, and return
+		// the new line and position.
+
+		// Otherwise, we'll just return the line.
+		return line, pos, false
+	}
+
+	// Print welcome message.
+	bt.WriteString(styleBold.Render("Welcome to the OpenAI API CLI assistant mode!\n"))
+	bt.Flush()
+
+	for {
+		// Move to left edge.
+		bt.WriteString("\033[0G")
+
+		// Print the prompt.
+		bt.WriteString("> ")
+
+		// Flush the buffer to the terminal.
+		bt.Flush()
+
+		// Read up to line from STDIN.
+		input, err := t.ReadLine()
+		if err != nil {
+			bt.WriteString(err.Error())
+			bt.Flush()
+			return
+		}
+
+		// Check if the user wants to exit.
+		if strings.TrimSpace(input) == "exit" {
+			break
+		}
+
+		// Check if user wants to clear the screen.
+		if strings.TrimSpace(input) == "clear" {
+			// Clear the screen.
+			cls()
+			continue
+		}
+
+		_, err = client.CreateMessage(ctx, &openai.CreateMessageRequest{
+			ThreadID: thread.ID,
+			Role:     openai.ChatRoleUser,
+			Content:  input,
+		})
+		if err != nil {
+			panic(err)
+		}
+
+		runResp, err := client.CreateRun(ctx, &openai.CreateRunRequest{
+			ThreadID:    thread.ID,
+			AssistantID: assistant.ID,
+		})
+		if err != nil {
+			panic(err)
+		}
+
+		// Wait for the run to complete.
+		// Wait for the run to finish
+		var ranResp *openai.Run
+		for {
+			// bt.WriteString(fmt.Sprintf("waiting for run to complete: %s\n", runResp.ID))
+			time.Sleep(700 * time.Millisecond)
+
+			ranResp, err = client.GetRun(ctx, &openai.GetRunRequest{
+				ThreadID: thread.ID,
+				RunID:    runResp.ID,
+			})
+			if err != nil {
+				panic(err)
+			}
+
+			var done bool
+
+			switch ranResp.Status {
+			case openai.RunStatusCompleted:
+				done = true
+			case openai.RunStatusQueued, openai.RunStatusInProgress:
+				continue
+			default:
+				panic(fmt.Errorf("unexpected run status: %s", ranResp.Status))
+			}
+
+			if done {
+				break
+			}
+		}
+
+		listResp, err := client.ListMessages(ctx, &openai.ListMessagesRequest{
+			ThreadID: thread.ID,
+			Limit:    1,
+		})
+		if err != nil {
+			panic(err)
+		}
+
+		textMap := listResp.Data[0].Content[0]["text"].(map[string]any)
+
+		nextMsg := fmt.Sprintf("%s", textMap["value"])
+
+		nextMsgMd, err := renderMarkdown(nextMsg, termWidth)
+		if err != nil {
+			panic(err)
+		}
+
+		bt.WriteString(nextMsgMd)
+	}
 }
