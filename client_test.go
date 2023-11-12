@@ -1108,7 +1108,7 @@ func TestAssistant_beta(t *testing.T) {
 			switch ranResp.Status {
 			case openai.RunStatusCompleted:
 				done = true
-			case openai.RunStatusQueued:
+			case openai.RunStatusQueued, openai.RunStatusInProgress:
 				continue
 			default:
 				t.Fatalf("unexpected run status: %q", ranResp.Status)
