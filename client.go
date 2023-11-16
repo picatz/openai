@@ -793,13 +793,6 @@ type UploadFileResponse struct {
 //		Purpose: "fine-tune",
 //	})
 //
-// # CURL
-//
-//	$ curl "https://api.openai.com/v1/files" \
-//	 -H "Authorization: Bearer ..." \
-//	 -F purpose="fine-tune" \
-//	 -F file='@mydata.jsonl'
-//
 // https://platform.openai.com/docs/api-reference/files
 func (c *Client) UploadFile(ctx context.Context, req *UploadFileRequest) (*UploadFileResponse, error) {
 	r, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/files", nil)
@@ -886,12 +879,6 @@ type DeleteFileResponse struct {
 //		ID: "file-123",
 //	})
 //
-// # CURL
-//
-//	$ curl "https://api.openai.com/v1/files/file-XjGxS3KTG0uNmNOK362iJua3" \
-//		-X DELETE \
-//		-H "Authorization: Bearer ..."
-//
 // https://platform.openai.com/docs/api-reference/files/delete
 func (c *Client) DeleteFile(ctx context.Context, req *DeleteFileRequest) (*DeleteFileResponse, error) {
 	r, err := http.NewRequestWithContext(ctx, http.MethodDelete, "https://api.openai.com/v1/files/"+req.ID, nil)
@@ -952,11 +939,6 @@ type GetFileInfoResponse struct {
 //		ID: "file-123",
 //	})
 //
-// # CURL
-//
-//	$ curl "https://api.openai.com/v1/files/file-XjGxS3KTG0uNmNOK362iJua3" \
-//		-H "Authorization: Bearer ..."
-//
 // https://platform.openai.com/docs/api-reference/files/retrieve
 func (c *Client) GetFileInfo(ctx context.Context, req *GetFileInfoRequest) (*GetFileInfoResponse, error) {
 	r, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.openai.com/v1/files/"+req.ID, nil)
@@ -1014,11 +996,6 @@ type GetFileContentResponse struct {
 //	resp, _ := c.GetFileContent(ctx, &openai.GetFileContentRequest{
 //		ID: "file-123",
 //	})
-//
-// # CURL
-//
-//	$ curl "https://api.openai.com/v1/files/file-XjGxS3KTG0uNmNOK362iJua3/contents" \
-//		-H "Authorization: Bearer ..."
 //
 // https://platform.openai.com/docs/api-reference/files/retrieve-content
 func (c *Client) GetFileContent(ctx context.Context, req *GetFileContentRequest) (*GetFileContentResponse, error) {
@@ -2416,15 +2393,6 @@ func (c *Client) CreateAssistant(ctx context.Context, req *CreateAssistantReques
 
 	return &res, nil
 }
-
-/*
-
-curl https://api.openai.com/v1/assistants/asst_abc123 \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $OPENAI_API_KEY" \
-  -H "OpenAI-Beta: assistants=v1"
-
-*/
 
 type GetAssistantRequest struct {
 	// https://platform.openai.com/docs/api-reference/assistants/get#assistants/get-id
