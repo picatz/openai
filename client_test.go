@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"testing"
@@ -956,6 +957,42 @@ func ExampleClient_CreateChat() {
 
 	fmt.Println(strings.ToLower(strings.TrimRight(strings.TrimSpace(resp.Choices[0].Message.Content), ".")))
 	// Output: red
+}
+
+func TestClientCreateSpeech(t *testing.T) {
+	c := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
+
+	ctx := context.Background()
+
+	audioStream, err := c.CreateSpeech(ctx, &openai.CreateSpeechRequest{
+		Model: openai.ModelTTS1HD1106,
+		Voice: "fable",
+		Input: "In a hole in the ground, there lived a hobbit. " +
+			"Not a nasty, dirty, wet hole, filled with the ends of worms " +
+			"and an oozy smell, nor yet a dry, bare, sandy hole with nothing " +
+			"in it to sit down on or to eat: it was a hobbit-hole, and that means comfort.",
+		ResponseFormat: "mp3",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer audioStream.Close()
+
+	// Write the audio to a file
+	fh, err := os.Create("testdata/hobbit.mp3")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = io.Copy(fh, audioStream)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = fh.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 // func TestAssistant_list_delete(t *testing.T) {

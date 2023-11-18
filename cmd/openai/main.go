@@ -15,6 +15,8 @@ import (
 
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/ebitengine/oto/v3"
+	"github.com/hajimehoshi/go-mp3"
 	"github.com/picatz/openai"
 	"golang.org/x/term"
 )
@@ -618,6 +620,29 @@ func summarizeMessages(client *openai.Client, model string, messages []openai.Ch
 func startAssistantChat(client *openai.Client, model string) error {
 	ctx := context.Background()
 
+	var speak bool
+
+	// I don't totally understand why this configuration works, but it does.
+	op := &oto.NewContextOptions{
+		// Usually 44100 or 48000. Other values might cause distortions in Oto
+		SampleRate: 48000 / 2,
+
+		// Use default buffer size.
+		BufferSize: 0,
+
+		// Stereo sound. Mono is also ok.
+		ChannelCount: 2,
+
+		// Format of the source. go-mp3's format is signed 16bit integers.
+		Format: oto.FormatSignedInt16LE,
+	}
+
+	// Remember that you should **not** create more than one context
+	otoCtx, readyChan, err := oto.NewContext(op)
+	if err != nil {
+		return fmt.Errorf("failed to create oto context: %w", err)
+	}
+
 	assistant, err := client.CreateAssistant(ctx, &openai.CreateAssistantRequest{
 		Model:        openai.ModelGPT41106Previw, // TODO: use given model
 		Instructions: "You are a helpful assistant for all kinds of tasks. Answer as concisely as possible.",
@@ -700,7 +725,7 @@ func startAssistantChat(client *openai.Client, model string) error {
 	t.AutoCompleteCallback = func(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
 		// If the user presses tab, then autocomplete the command.
 		if key == '\t' {
-			for _, cmd := range []string{"exit", "clear", "delete", "copy", "upload", "system:", "<clipboard>"} {
+			for _, cmd := range []string{"exit", "clear", "ls", "copy", "upload", "system:", "<clipboard>"} {
 				if strings.HasPrefix(cmd, line) {
 					// Autocomplete the command.
 					// t.Write([]byte(cmd[len(line):]))
@@ -750,6 +775,13 @@ func startAssistantChat(client *openai.Client, model string) error {
 		switch strings.TrimSpace(input) {
 		case "exit":
 			return nil
+		case "speak!":
+			speak = true
+
+			// It might take a bit for the hardware audio devices to be ready, so we wait on the channel.
+			<-readyChan
+
+			continue
 		case "clear":
 			// Clear the screen.
 			cls()
@@ -996,5 +1028,46 @@ func startAssistantChat(client *openai.Client, model string) error {
 		}
 
 		bt.WriteString(nextMsgMd)
+
+		if speak {
+			bt.Flush()
+
+			// Check the message is less than or equal to 4096 characters.
+			if len(nextMsg) > 4096 {
+				nextMsg = nextMsg[:4096]
+			}
+
+			audioStream, err := client.CreateSpeech(ctx, &openai.CreateSpeechRequest{
+				Model:          openai.ModelTTS1HD1106,
+				Voice:          "fable",
+				Input:          nextMsg,
+				ResponseFormat: "mp3",
+			})
+			if err != nil {
+				bt.WriteString(fmt.Sprintf("failed to create speech: %s\n", err))
+				continue
+			}
+
+			decodedMp3, err := mp3.NewDecoder(audioStream)
+			if err != nil {
+				return fmt.Errorf("failed to decode mp3: %w", err)
+			}
+
+			// Create a new 'player' that will handle our sound. Paused by default.
+			player := otoCtx.NewPlayer(decodedMp3)
+
+			// Play starts playing the sound and returns without waiting for it (Play() is async).
+			player.Play()
+
+			// We can wait for the sound to finish playing using something like this
+			for player.IsPlaying() {
+				time.Sleep(time.Millisecond)
+			}
+
+			err = player.Close()
+			if err != nil {
+				return fmt.Errorf("failed to close player: %w", err)
+			}
+		}
 	}
 }

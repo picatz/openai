@@ -4131,3 +4131,64 @@ func (c *Client) ListRunSteps(ctx context.Context, req *ListRunStepsRequest) (*L
 	}
 	return &res, nil
 }
+
+// https://platform.openai.com/docs/api-reference/audio/createSpeech
+type CreateSpeechRequest struct {
+	// https://platform.openai.com/docs/api-reference/audio/createSpeech#audio-createspeech-model
+	//
+	// Required.
+	Model string `json:"model"`
+
+	// https://platform.openai.com/docs/api-reference/audio/createSpeech#audio-createspeech-input
+	//
+	// Required.
+	Input string `json:"input"`
+
+	// https://platform.openai.com/docs/api-reference/audio/createSpeech#audio-createspeech-voice
+	//
+	// Required.
+	Voice string `json:"voice,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/audio/createSpeech#audio-createspeech-response_format
+	//
+	// Optional. Defaults to "mp3".
+	ResponseFormat string `json:"response_format,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/audio/createSpeech#audio-createspeech-speed
+	//
+	// Optional. Defaults to 1.
+	Speed float64 `json:"speed,omitempty"`
+}
+
+// https://platform.openai.com/docs/api-reference/audio/createSpeech#audio-createspeech-response
+func (c *Client) CreateSpeech(ctx context.Context, req *CreateSpeechRequest) (io.ReadCloser, error) {
+	b, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/audio/speech", bytes.NewReader(b))
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+
+	return resp.Body, nil
+}

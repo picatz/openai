@@ -5,6 +5,8 @@ go 1.19
 require (
 	github.com/charmbracelet/glamour v0.6.0
 	github.com/charmbracelet/lipgloss v0.8.0
+	github.com/ebitengine/oto/v3 v3.1.0
+	github.com/hajimehoshi/go-mp3 v0.3.4
 	golang.org/x/term v0.13.0
 	golang.org/x/time v0.3.0
 )
@@ -14,6 +16,7 @@ require (
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/dlclark/regexp2 v1.10.0 // indirect
+	github.com/ebitengine/purego v0.5.0 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
