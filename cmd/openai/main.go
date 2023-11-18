@@ -778,8 +778,25 @@ func startAssistantChat(client *openai.Client, model string) error {
 		case "speak!":
 			speak = true
 
+			bt.WriteString(styleFaint.Render("speaking mode enabled\n"))
+
 			// It might take a bit for the hardware audio devices to be ready, so we wait on the channel.
 			<-readyChan
+
+			continue
+		case "speak?":
+
+			if speak {
+				bt.WriteString(styleFaint.Render("speaking mode enabled\n"))
+			} else {
+				bt.WriteString(styleFaint.Render("speaking mode disabled\n"))
+			}
+
+			continue
+		case "quiet!":
+			speak = false
+
+			bt.WriteString(styleFaint.Render("speaking mode disabled\n"))
 
 			continue
 		case "clear":
