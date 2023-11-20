@@ -785,7 +785,6 @@ func startAssistantChat(client *openai.Client, model string) error {
 
 			continue
 		case "speak?":
-
 			if speak {
 				bt.WriteString(styleFaint.Render("speaking mode enabled\n"))
 			} else {
@@ -837,9 +836,7 @@ func startAssistantChat(client *openai.Client, model string) error {
 				return fmt.Errorf("failed to list messages: %w", err)
 			}
 
-			textMap := listResp.Data[0].Content[0]["text"].(map[string]any)
-
-			lastMsg := fmt.Sprintf("%s", textMap["value"])
+			lastMsg := listResp.Data[0].Content[0].Text()
 
 			// Write the last message to the clipboard.
 			err = writeClipboard(lastMsg)
@@ -1034,9 +1031,7 @@ func startAssistantChat(client *openai.Client, model string) error {
 			return fmt.Errorf("failed to list messages: %w", err)
 		}
 
-		textMap := listResp.Data[0].Content[0]["text"].(map[string]any)
-
-		nextMsg := fmt.Sprintf("%s", textMap["value"])
+		nextMsg := listResp.Data[0].Content[0].Text()
 
 		// render 60% of terminal width
 		nextMsgMd, err := renderMarkdown(nextMsg, int(float64(termWidth)*0.6))
@@ -1076,10 +1071,18 @@ func startAssistantChat(client *openai.Client, model string) error {
 			// Play starts playing the sound and returns without waiting for it (Play() is async).
 			player.Play()
 
+			// Print a message to the terminal to indicate that we're playing audio.
+			bt.WriteString(styleFaint.Render("playing audio..."))
+
+			bt.Flush()
+
 			// We can wait for the sound to finish playing using something like this
 			for player.IsPlaying() {
 				time.Sleep(time.Millisecond)
 			}
+
+			// Clear the playing audio message.
+			bt.WriteString("\033[2K")
 
 			err = player.Close()
 			if err != nil {
