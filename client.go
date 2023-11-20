@@ -3085,17 +3085,31 @@ func (c *Client) DeleteThread(ctx context.Context, req *DeleteThreadRequest) err
 }
 
 // https://platform.openai.com/docs/api-reference/messages/object
+type ThreadMessageContent map[string]any
+
+// Text returns the text value from the thread message content, or
+// an empty string if the text value is not present.
+func (t ThreadMessageContent) Text() string {
+	textMap, ok := t["text"].(map[string]any)
+	if !ok {
+		return ""
+	}
+
+	return fmt.Sprintf("%s", textMap["value"])
+}
+
+// https://platform.openai.com/docs/api-reference/messages/object
 type ThreadMessage struct {
-	ID          string           `json:"id"`
-	Object      string           `json:"object"`
-	CreatedAt   int              `json:"created_at"`
-	ThreadID    string           `json:"thread_id"`
-	Role        string           `json:"role"`
-	Content     []map[string]any `json:"content"`
-	AssistantID string           `json:"assistant_id,omitempty"`
-	RunID       string           `json:"run_id,omitempty"`
-	FileIDs     []string         `json:"file_ids,omitempty"`
-	Metadata    map[string]any   `json:"metadata,omitempty"`
+	ID          string                 `json:"id"`
+	Object      string                 `json:"object"`
+	CreatedAt   int                    `json:"created_at"`
+	ThreadID    string                 `json:"thread_id"`
+	Role        string                 `json:"role"`
+	Content     []ThreadMessageContent `json:"content"`
+	AssistantID string                 `json:"assistant_id,omitempty"`
+	RunID       string                 `json:"run_id,omitempty"`
+	FileIDs     []string               `json:"file_ids,omitempty"`
+	Metadata    map[string]any         `json:"metadata,omitempty"`
 }
 
 // https://platform.openai.com/docs/api-reference/messages/createMessage
