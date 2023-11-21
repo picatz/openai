@@ -793,13 +793,6 @@ type UploadFileResponse struct {
 //		Purpose: "fine-tune",
 //	})
 //
-// # CURL
-//
-//	$ curl "https://api.openai.com/v1/files" \
-//	 -H "Authorization: Bearer ..." \
-//	 -F purpose="fine-tune" \
-//	 -F file='@mydata.jsonl'
-//
 // https://platform.openai.com/docs/api-reference/files
 func (c *Client) UploadFile(ctx context.Context, req *UploadFileRequest) (*UploadFileResponse, error) {
 	r, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/files", nil)
@@ -886,12 +879,6 @@ type DeleteFileResponse struct {
 //		ID: "file-123",
 //	})
 //
-// # CURL
-//
-//	$ curl "https://api.openai.com/v1/files/file-XjGxS3KTG0uNmNOK362iJua3" \
-//		-X DELETE \
-//		-H "Authorization: Bearer ..."
-//
 // https://platform.openai.com/docs/api-reference/files/delete
 func (c *Client) DeleteFile(ctx context.Context, req *DeleteFileRequest) (*DeleteFileResponse, error) {
 	r, err := http.NewRequestWithContext(ctx, http.MethodDelete, "https://api.openai.com/v1/files/"+req.ID, nil)
@@ -952,11 +939,6 @@ type GetFileInfoResponse struct {
 //		ID: "file-123",
 //	})
 //
-// # CURL
-//
-//	$ curl "https://api.openai.com/v1/files/file-XjGxS3KTG0uNmNOK362iJua3" \
-//		-H "Authorization: Bearer ..."
-//
 // https://platform.openai.com/docs/api-reference/files/retrieve
 func (c *Client) GetFileInfo(ctx context.Context, req *GetFileInfoRequest) (*GetFileInfoResponse, error) {
 	r, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.openai.com/v1/files/"+req.ID, nil)
@@ -1014,11 +996,6 @@ type GetFileContentResponse struct {
 //	resp, _ := c.GetFileContent(ctx, &openai.GetFileContentRequest{
 //		ID: "file-123",
 //	})
-//
-// # CURL
-//
-//	$ curl "https://api.openai.com/v1/files/file-XjGxS3KTG0uNmNOK362iJua3/contents" \
-//		-H "Authorization: Bearer ..."
 //
 // https://platform.openai.com/docs/api-reference/files/retrieve-content
 func (c *Client) GetFileContent(ctx context.Context, req *GetFileContentRequest) (*GetFileContentResponse, error) {
@@ -2321,6 +2298,1911 @@ func (c *Client) CreateAudioTranscription(ctx context.Context, req *CreateAudioT
 	return res, nil
 }
 
-// TODO:
-// - https://platform.openai.com/docs/api-reference/images/create-edit
-// - https://platform.openai.com/docs/api-reference/images/create-variation
+// https://platform.openai.com/docs/api-reference/assistants/create
+type CreateAssistantRequest struct {
+	// https://platform.openai.com/docs/api-reference/assistants/createAssistant#assistants-createassistant-model
+	//
+	// Required.
+	Model string `json:"model"`
+
+	// https://platform.openai.com/docs/api-reference/assistants/createAssistant#assistants-createassistant-instructions
+	//
+	// Optional.
+	Instructions string `json:"instructions,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/assistants/createAssistant#assistants-createassistant-name
+	//
+	// Optional.
+	Name string `json:"name,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/assistants/createAssistant#assistants-createassistant-description
+	//
+	// Optional.
+	Description string `json:"description,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/assistants/createAssistant#assistants-createassistant-tools
+	//
+	// Optional.
+	Tools []map[string]any `json:"tools,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/assistants/createAssistant#assistants-createassistant-file_ids
+	//
+	// Optional.
+	FileIDs []string `json:"file_ids,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/assistants/createAssistant#assistants-createassistant-metadata
+	//
+	// Optional.
+	Metadata map[string]any `json:"metadata,omitempty"`
+}
+
+// https://platform.openai.com/docs/api-reference/assistants/object
+type Assistant struct {
+	ID           string           `json:"id"`
+	Object       string           `json:"object"`
+	Created      int              `json:"created"`
+	Name         string           `json:"name"`
+	Description  string           `json:"description"`
+	Model        string           `json:"model"`
+	Instructions string           `json:"instructions"`
+	Tools        []map[string]any `json:"tools"`
+	FileIDs      []string         `json:"file_ids"`
+	Metadata     map[string]any   `json:"metadata"`
+}
+
+// https://platform.openai.com/docs/api-reference/assistants/create
+type CreateAssistantResponse = Assistant
+
+// https://platform.openai.com/docs/api-reference/assistants/create
+func (c *Client) CreateAssistant(ctx context.Context, req *CreateAssistantRequest) (*CreateAssistantResponse, error) {
+	b, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/assistants", bytes.NewReader(b))
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Content-Type", "application/json")
+
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+
+	var res CreateAssistantResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &res, nil
+}
+
+type GetAssistantRequest struct {
+	// https://platform.openai.com/docs/api-reference/assistants/get#assistants/get-id
+	//
+	// Required.
+	ID string `json:"assistant_id"`
+}
+
+// https://platform.openai.com/docs/api-reference/assistants/get#assistants/get-id
+type GetAssistantResponse = Assistant
+
+// https://platform.openai.com/docs/api-reference/assistants/get#assistants/get-id
+func (c *Client) GetAssistant(ctx context.Context, req *GetAssistantRequest) (*GetAssistantResponse, error) {
+	r, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.openai.com/v1/assistants/"+req.ID, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Content-Type", "application/json")
+
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+
+	var res GetAssistantResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &res, nil
+}
+
+// https://platform.openai.com/docs/api-reference/assistants/modifyAssistant
+type UpdateAssistantRequest struct {
+	// https://platform.openai.com/docs/api-reference/assistants/update#assistants/update-id
+	//
+	// Required.
+	ID string `json:"-"`
+
+	// https://platform.openai.com/docs/api-reference/assistants/modifyAssistant#assistants-modifyassistant-model
+	//
+	// Optional.
+	Model string `json:"model,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/assistants/modifyAssistant#assistants-modifyassistant-name
+	//
+	// Optional.
+	Name string `json:"name,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/assistants/modifyAssistant#assistants-modifyassistant-description
+	//
+	// Optional.
+	Description string `json:"description,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/assistants/modifyAssistant#assistants-modifyassistant-instructions
+	//
+	// Optional.
+	Instructions string `json:"instructions,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/assistants/modifyAssistant#assistants-modifyassistant-tools
+	//
+	// Optional.
+	Tools []map[string]any `json:"tools,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/assistants/modifyAssistant#assistants-modifyassistant-file_ids
+	//
+	// Optional.
+	FileIDs []string `json:"file_ids,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/assistants/modifyAssistant#assistants-modifyassistant-metadata
+	//
+	// Optional.
+	Metadata map[string]any `json:"metadata,omitempty"`
+}
+
+func (c *Client) UpdateAssistant(ctx context.Context, req *UpdateAssistantRequest) (*Assistant, error) {
+	b, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/assistants/"+req.ID, bytes.NewReader(b))
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Content-Type", "application/json")
+
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+
+	var res Assistant
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &res, nil
+}
+
+// https://platform.openai.com/docs/api-reference/assistants/deleteAssistant
+type DeleteAssistantRequest struct {
+	// https://platform.openai.com/docs/api-reference/assistants/delete#assistants/delete-id
+	//
+	// Required.
+	ID string `json:"assistant_id"`
+}
+
+func (c *Client) DeleteAssistant(ctx context.Context, req *DeleteAssistantRequest) error {
+	r, err := http.NewRequestWithContext(ctx, http.MethodDelete, "https://api.openai.com/v1/assistants/"+req.ID, nil)
+	if err != nil {
+		return err
+	}
+
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		return fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+
+	return nil
+}
+
+// https://platform.openai.com/docs/api-reference/assistants/listAssistants#assistants-listassistants-request
+type ListAssistantsRequest struct {
+	// https://platform.openai.com/docs/api-reference/assistants/listAssistants#assistants-listassistants-limit
+	//
+	// Optional. Defaults to 20.
+	Limit int `json:"limit,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/assistants/listAssistants#assistants-listassistants-order
+	//
+	// Optional. Defaults to "desc".
+	Order string `json:"order,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/assistants/listAssistants#assistants-listassistants-after
+	//
+	// Optional.
+	After string `json:"after,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/assistants/listAssistants#assistants-listassistants-before
+	//
+	// Optional.
+	Before string `json:"before,omitempty"`
+}
+
+// https://platform.openai.com/docs/api-reference/assistants/listAssistants#assistants-listassistants-response
+type ListAssistantsResponse struct {
+	Data []Assistant `json:"data"`
+}
+
+// https://platform.openai.com/docs/api-reference/assistants/listAssistants
+func (c *Client) ListAssistants(ctx context.Context, req *ListAssistantsRequest) (*ListAssistantsResponse, error) {
+	r, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.openai.com/v1/assistants", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	q := r.URL.Query()
+
+	if req.Limit != 0 {
+		q.Set("limit", strconv.Itoa(req.Limit))
+	}
+
+	if req.Order != "" {
+		q.Set("order", req.Order)
+	}
+
+	if req.After != "" {
+		q.Set("after", req.After)
+	}
+
+	if req.Before != "" {
+		q.Set("before", req.Before)
+	}
+
+	r.URL.RawQuery = q.Encode()
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+
+	var res ListAssistantsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &res, nil
+}
+
+// https://platform.openai.com/docs/api-reference/assistants/file-object
+type AssistantFile struct {
+	ID          string `json:"id"`
+	Object      string `json:"object"`
+	Created     int    `json:"created"`
+	AssistantID string `json:"assistant_id"`
+}
+
+// https://platform.openai.com/docs/api-reference/assistants/createAssistantFile
+type CreateAssistantFileRequest struct {
+	// https://platform.openai.com/docs/api-reference/assistants/createAssistantFile#assistants-createassistantfile-assistant_id
+	//
+	// Required.
+	AssistantID string `json:"assistant_id"`
+
+	// https://platform.openai.com/docs/api-reference/assistants/createAssistantFile#assistants-createassistantfile-file
+	//
+	// Required.
+	FileID string `json:"file"`
+}
+
+// https://platform.openai.com/docs/api-reference/assistants/createAssistantFile#assistants-createassistantfile-response
+type CreateAssistantFileResponse = AssistantFile
+
+// https://platform.openai.com/docs/api-reference/assistants/createAssistantFile
+func (c *Client) CreateAssistantFile(ctx context.Context, req *CreateAssistantFileRequest) (*CreateAssistantFileResponse, error) {
+	b, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/assistants/"+req.AssistantID+"/files", bytes.NewReader(b))
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+
+	var res CreateAssistantFileResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &res, nil
+}
+
+// https://platform.openai.com/docs/api-reference/assistants/getAssistantFile
+type GetAssistantFileRequest struct {
+	// https://platform.openai.com/docs/api-reference/assistants/getAssistantFile#assistants-getassistantfile-assistant_id
+	//
+	// Required.
+	AssistantID string `json:"assistant_id"`
+
+	// https://platform.openai.com/docs/api-reference/assistants/getAssistantFile#assistants-getassistantfile-file_id
+	//
+	// Required.
+	FileID string `json:"file_id"`
+}
+
+// https://platform.openai.com/docs/api-reference/assistants/getAssistantFile#assistants-getassistantfile-response
+type GetAssistantFileResponse = AssistantFile
+
+func (c *Client) GetAssistantFile(ctx context.Context, req *GetAssistantFileRequest) (*GetAssistantFileResponse, error) {
+	r, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.openai.com/v1/assistants/"+req.AssistantID+"/files/"+req.FileID, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+
+	var res GetAssistantFileResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &res, nil
+}
+
+// https://platform.openai.com/docs/api-reference/assistants/deleteAssistantFile
+type DeleteAssistantFileRequest struct {
+	// https://platform.openai.com/docs/api-reference/assistants/deleteAssistantFile#assistants-deleteassistantfile-assistant_id
+	//
+	// Required.
+	AssistantID string `json:"assistant_id"`
+
+	// https://platform.openai.com/docs/api-reference/assistants/deleteAssistantFile#assistants-deleteassistantfile-file_id
+	//
+	// Required.
+	FileID string `json:"file_id"`
+}
+
+// https://platform.openai.com/docs/api-reference/assistants/deleteAssistantFile
+func (c *Client) DeleteAssistantFile(ctx context.Context, req *DeleteAssistantFileRequest) error {
+	r, err := http.NewRequestWithContext(ctx, http.MethodDelete, "https://api.openai.com/v1/assistants/"+req.AssistantID+"/files/"+req.FileID, nil)
+	if err != nil {
+		return err
+	}
+
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		return fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+
+	return nil
+}
+
+// https://platform.openai.com/docs/api-reference/assistants/listAssistantFiles
+type ListAssistantFilesRequest struct {
+	// https://platform.openai.com/docs/api-reference/assistants/listAssistantFiles#assistants-listassistantfiles-assistant_id
+	//
+	// Required.
+	AssistantID string `json:"-"`
+
+	// https://platform.openai.com/docs/api-reference/assistants/listAssistantFiles#assistants-listassistantfiles-limit
+	//
+	// Optional. Defaults to 20.
+	Limit int `json:"limit,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/assistants/listAssistantFiles#assistants-listassistantfiles-order
+	//
+	// Optional. Defaults to "desc".
+	Order string `json:"order,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/assistants/listAssistantFiles#assistants-listassistantfiles-after
+	//
+	// Optional.
+	After string `json:"after,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/assistants/listAssistantFiles#assistants-listassistantfiles-before
+	//
+	// Optional.
+	Before string `json:"before,omitempty"`
+}
+
+// https://platform.openai.com/docs/api-reference/assistants/listAssistantFiles#assistants-listassistantfiles-response
+type ListAssistantFilesResponse struct {
+	Data []AssistantFile `json:"data"`
+}
+
+// https://platform.openai.com/docs/api-reference/assistants/listAssistantFiles
+func (c *Client) ListAssistantFiles(ctx context.Context, req *ListAssistantFilesRequest) (*ListAssistantFilesResponse, error) {
+	r, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.openai.com/v1/assistants/"+req.AssistantID+"/files", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	q := r.URL.Query()
+
+	if req.Limit != 0 {
+		q.Set("limit", strconv.Itoa(req.Limit))
+	}
+
+	if req.Order != "" {
+		q.Set("order", req.Order)
+	}
+
+	if req.After != "" {
+		q.Set("after", req.After)
+	}
+
+	if req.Before != "" {
+		q.Set("before", req.Before)
+	}
+
+	r.URL.RawQuery = q.Encode()
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+
+	var res ListAssistantFilesResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &res, nil
+}
+
+// https://platform.openai.com/docs/api-reference/threads/object
+type Thread struct {
+	ID       string         `json:"id"`
+	Object   string         `json:"object"`
+	Created  int            `json:"created"`
+	Metadata map[string]any `json:"metadata"`
+}
+
+// https://platform.openai.com/docs/api-reference/threads/createThread
+type CreateThreadRequest struct {
+	// https://platform.openai.com/docs/api-reference/threads/createThread#threads-createthread-messages
+	//
+	// Optional.
+	Messages []*ChatMessage `json:"messages,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/threads/createThread#threads-createthread-metadata
+	//
+	// Optional.
+	Metadata map[string]any `json:"metadata,omitempty"`
+}
+
+// https://platform.openai.com/docs/api-reference/threads/createThread
+type CreateThreadResponse = Thread
+
+// https://platform.openai.com/docs/api-reference/threads/createThread
+func (c *Client) CreateThread(ctx context.Context, req *CreateThreadRequest) (*CreateThreadResponse, error) {
+	b, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/threads", bytes.NewReader(b))
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+	defer resp.Body.Close()
+
+	var res CreateThreadResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &res, nil
+}
+
+// https://platform.openai.com/docs/api-reference/threads/getThread
+type GetThreadRequest struct {
+	// https://platform.openai.com/docs/api-reference/threads/getThread#threads-getthread-id
+	//
+	// Required.
+	ID string `json:"thread_id"`
+}
+
+// https://platform.openai.com/docs/api-reference/threads/getThread#threads-getthread-response
+type GetThreadResponse = Thread
+
+func (c *Client) GetThread(ctx context.Context, req *GetThreadRequest) (*GetThreadResponse, error) {
+	r, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.openai.com/v1/threads/"+req.ID, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+	defer resp.Body.Close()
+
+	var res GetThreadResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &res, nil
+}
+
+// https://platform.openai.com/docs/api-reference/threads/modifyThread
+type UpdateThreadRequest struct {
+	// https://platform.openai.com/docs/api-reference/threads/modifyThread#threads-modifythread-id
+	//
+	// Required.
+	ID string `json:"thread_id"`
+
+	// https://platform.openai.com/docs/api-reference/threads/modifyThread#threads-modifythread-metadata
+	//
+	// Optional.
+	Metadata map[string]any `json:"metadata,omitempty"`
+}
+
+type UpdateThreadResponse = Thread
+
+func (c *Client) UpdateThread(ctx context.Context, req *UpdateThreadRequest) (*UpdateThreadResponse, error) {
+	b, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := http.NewRequestWithContext(ctx, http.MethodPatch, "https://api.openai.com/v1/threads/"+req.ID, bytes.NewReader(b))
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+	defer resp.Body.Close()
+
+	var res UpdateThreadResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &res, nil
+}
+
+// https://platform.openai.com/docs/api-reference/threads/deleteThread
+type DeleteThreadRequest struct {
+	// https://platform.openai.com/docs/api-reference/threads/deleteThread#threads-deletethread-id
+	//
+	// Required.
+	ID string `json:"thread_id"`
+}
+
+// https://platform.openai.com/docs/api-reference/threads/deleteThread
+func (c *Client) DeleteThread(ctx context.Context, req *DeleteThreadRequest) error {
+	r, err := http.NewRequestWithContext(ctx, http.MethodDelete, "https://api.openai.com/v1/threads/"+req.ID, nil)
+	if err != nil {
+		return err
+	}
+
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		return fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+
+	return nil
+}
+
+// https://platform.openai.com/docs/api-reference/messages/object
+type ThreadMessageContent map[string]any
+
+// Text returns the text value from the thread message content, or
+// an empty string if the text value is not present.
+func (t ThreadMessageContent) Text() string {
+	textMap, ok := t["text"].(map[string]any)
+	if !ok {
+		return ""
+	}
+
+	return fmt.Sprintf("%s", textMap["value"])
+}
+
+// https://platform.openai.com/docs/api-reference/messages/object
+type ThreadMessage struct {
+	ID          string                 `json:"id"`
+	Object      string                 `json:"object"`
+	CreatedAt   int                    `json:"created_at"`
+	ThreadID    string                 `json:"thread_id"`
+	Role        string                 `json:"role"`
+	Content     []ThreadMessageContent `json:"content"`
+	AssistantID string                 `json:"assistant_id,omitempty"`
+	RunID       string                 `json:"run_id,omitempty"`
+	FileIDs     []string               `json:"file_ids,omitempty"`
+	Metadata    map[string]any         `json:"metadata,omitempty"`
+}
+
+// https://platform.openai.com/docs/api-reference/messages/createMessage
+type CreateMessageRequest struct {
+	// https://platform.openai.com/docs/api-reference/messages/createMessage#messages-createmessage-thread_id
+	//
+	// Required.
+	ThreadID string `json:"-"`
+
+	// https://platform.openai.com/docs/api-reference/messages/createMessage#messages-createmessage-role
+	//
+	// Required.
+	Role string `json:"role"`
+
+	// https://platform.openai.com/docs/api-reference/messages/createMessage#messages-createmessage-content
+	//
+	// Required.
+	Content string `json:"content"`
+
+	// https://platform.openai.com/docs/api-reference/messages/createMessage#messages-createmessage-file_ids
+	//
+	// Optional.
+	FileIDs []string `json:"file_ids,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/messages/createMessage#messages-createmessage-metadata
+	//
+	// Optional.
+	Metadata map[string]any `json:"metadata,omitempty"`
+}
+
+// https://platform.openai.com/docs/api-reference/messages/createMessage
+type CreateMessageResponse = ThreadMessage
+
+// https://platform.openai.com/docs/api-reference/messages/createMessage
+func (c *Client) CreateMessage(ctx context.Context, req *CreateMessageRequest) (*CreateMessageResponse, error) {
+	b, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/threads/"+req.ThreadID+"/messages", bytes.NewReader(b))
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+	defer resp.Body.Close()
+
+	var res CreateMessageResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &res, nil
+}
+
+// https://platform.openai.com/docs/api-reference/messages/getMessage
+type GetMessageRequest struct {
+	// https://platform.openai.com/docs/api-reference/messages/getMessage#messages-getmessage-thread_id
+	//
+	// Required.
+	ThreadID string `json:"thread_id"`
+
+	// https://platform.openai.com/docs/api-reference/messages/getMessage#messages-getmessage-message_id
+	//
+	// Required.
+	MessageID string `json:"message_id"`
+}
+
+// https://platform.openai.com/docs/api-reference/messages/getMessage#messages-getmessage-response
+type GetMessageResponse = ThreadMessage
+
+func (c *Client) GetMessage(ctx context.Context, req *GetMessageRequest) (*GetMessageResponse, error) {
+	r, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.openai.com/v1/messages/"+req.MessageID, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+	defer resp.Body.Close()
+
+	var res GetMessageResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &res, nil
+}
+
+// https://platform.openai.com/docs/api-reference/messages/modifyMessage
+type UpdateMessageRequest struct {
+	// https://platform.openai.com/docs/api-reference/messages/getMessage#messages-getmessage-thread_id
+	//
+	// Required.
+	ThreadID string `json:"thread_id"`
+
+	// https://platform.openai.com/docs/api-reference/messages/getMessage#messages-getmessage-message_id
+	//
+	// Required.
+	MessageID string `json:"message_id"`
+
+	// https://platform.openai.com/docs/api-reference/messages/modifyMessage#messages-modifymessage-metadata
+	//
+	// Optional.
+	Metadata map[string]any `json:"metadata,omitempty"`
+}
+
+// https://platform.openai.com/docs/api-reference/messages/modifyMessage#messages-modifymessage-response
+type UpdateMessageResponse = ThreadMessage
+
+func (c *Client) UpdateMessage(ctx context.Context, req *UpdateMessageRequest) (*UpdateMessageResponse, error) {
+	b, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := http.NewRequestWithContext(ctx, http.MethodPatch, "https://api.openai.com/v1/messages/"+req.MessageID, bytes.NewReader(b))
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+	defer resp.Body.Close()
+
+	var res UpdateMessageResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &res, nil
+}
+
+// https://platform.openai.com/docs/api-reference/messages/listMessages
+type ListMessagesRequest struct {
+	// https://platform.openai.com/docs/api-reference/messages/listMessages#messages-listmessages-thread_id
+	//
+	// Required.
+	ThreadID string `json:"thread_id"`
+
+	// https://platform.openai.com/docs/api-reference/messages/listMessages#messages-listmessages-limit
+	//
+	// Optional. Defaults to 20.
+	Limit int `json:"limit,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/messages/listMessages#messages-listmessages-order
+	//
+	// Optional. Defaults to "desc".
+	Order string `json:"order,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/messages/listMessages#messages-listmessages-after
+	//
+	// Optional.
+	After string `json:"after,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/messages/listMessages#messages-listmessages-before
+	//
+	// Optional.
+	Before string `json:"before,omitempty"`
+}
+
+// https://platform.openai.com/docs/api-reference/messages/listMessages#messages-listmessages-response
+type ListMessagesResponse struct {
+	Data []ThreadMessage `json:"data"`
+}
+
+func (c *Client) ListMessages(ctx context.Context, req *ListMessagesRequest) (*ListMessagesResponse, error) {
+	r, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.openai.com/v1/threads/"+req.ThreadID+"/messages", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	q := r.URL.Query()
+
+	if req.Limit != 0 {
+		q.Set("limit", strconv.Itoa(req.Limit))
+	}
+
+	if req.Order != "" {
+		q.Set("order", req.Order)
+	}
+
+	if req.After != "" {
+		q.Set("after", req.After)
+	}
+
+	if req.Before != "" {
+		q.Set("before", req.Before)
+	}
+
+	r.URL.RawQuery = q.Encode()
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+	defer resp.Body.Close()
+
+	var res ListMessagesResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &res, nil
+}
+
+// https://platform.openai.com/docs/api-reference/messages/file-object
+type MessageFile struct {
+	ID        string `json:"id"`
+	Object    string `json:"object"`
+	Created   int    `json:"created"`
+	MessageID string `json:"message_id"`
+}
+
+// https://platform.openai.com/docs/api-reference/messages/getMessageFile
+type GetMessageFileRequest struct {
+	// https://platform.openai.com/docs/api-reference/messages/getMessageFile#messages-getmessagefile-thread_id
+	//
+	// Required.
+	ThreadID string `json:"thread_id"`
+
+	// https://platform.openai.com/docs/api-reference/messages/getMessageFile#messages-getmessagefile-message_id
+	//
+	// Required.
+	MessageID string `json:"message_id"`
+
+	// https://platform.openai.com/docs/api-reference/messages/getMessageFile#messages-getmessagefile-file_id
+	//
+	// Required.
+	FileID string `json:"file_id"`
+}
+
+// https://platform.openai.com/docs/api-reference/messages/getMessageFile#messages-getmessagefile-response
+type GetMessageFileResponse = MessageFile
+
+func (c *Client) GetMessageFile(ctx context.Context, req *GetMessageFileRequest) (*GetMessageFileResponse, error) {
+	r, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.openai.com/v1/messages/"+req.MessageID+"/files/"+req.FileID, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+	defer resp.Body.Close()
+
+	var res GetMessageFileResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &res, nil
+}
+
+// https://platform.openai.com/docs/api-reference/messages/listMessageFiles
+type ListMessageFilesRequest struct {
+	// https://platform.openai.com/docs/api-reference/messages/listMessageFiles#messages-listmessagefiles-thread_id
+	//
+	// Required.
+	ThreadID string `json:"thread_id"`
+
+	// https://platform.openai.com/docs/api-reference/messages/listMessageFiles#messages-listmessagefiles-message_id
+	//
+	// Required.
+	MessageID string `json:"message_id"`
+
+	// https://platform.openai.com/docs/api-reference/messages/listMessageFiles#messages-listmessagefiles-limit
+	//
+	// Optional. Defaults to 20.
+	Limit int `json:"limit,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/messages/listMessageFiles#messages-listmessagefiles-order
+	//
+	// Optional. Defaults to "desc".
+	Order string `json:"order,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/messages/listMessageFiles#messages-listmessagefiles-after
+	//
+	// Optional.
+	After string `json:"after,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/messages/listMessageFiles#messages-listmessagefiles-before
+	//
+	// Optional.
+	Before string `json:"before,omitempty"`
+}
+
+// https://platform.openai.com/docs/api-reference/messages/listMessageFiles#messages-listmessagefiles-response
+type ListMessageFilesResponse struct {
+	Data []MessageFile `json:"data"`
+}
+
+func (c *Client) ListMessageFiles(ctx context.Context, req *ListMessageFilesRequest) (*ListMessageFilesResponse, error) {
+	r, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.openai.com/v1/messages/"+req.MessageID+"/files", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	q := r.URL.Query()
+
+	if req.Limit != 0 {
+		q.Set("limit", strconv.Itoa(req.Limit))
+	}
+
+	if req.Order != "" {
+		q.Set("order", req.Order)
+	}
+
+	if req.After != "" {
+		q.Set("after", req.After)
+	}
+
+	if req.Before != "" {
+		q.Set("before", req.Before)
+	}
+
+	r.URL.RawQuery = q.Encode()
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+	defer resp.Body.Close()
+
+	var res ListMessageFilesResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &res, nil
+}
+
+// https://platform.openai.com/docs/api-reference/runs/object
+type Run struct {
+	ID             string           `json:"id"`
+	Object         string           `json:"object"`
+	CreatedAt      int              `json:"created_at"`
+	ThreadID       string           `json:"thread_id"`
+	AssistantID    string           `json:"assistant_id"`
+	Status         string           `json:"status"`
+	RequiredAction string           `json:"required_action,omitempty"`
+	LastError      map[string]any   `json:"last_error,omitempty"`
+	ExpiresAt      int              `json:"expires_at"`
+	StartedAt      int              `json:"started_at,omitempty"`
+	CancelledAt    int              `json:"cancelled_at,omitempty"`
+	FailedAt       int              `json:"failed_at,omitempty"`
+	CompletedAt    int              `json:"completed_at,omitempty"`
+	Model          string           `json:"model"`
+	Instructions   string           `json:"instructions"`
+	Tools          []map[string]any `json:"tools"`
+	FileIDs        []string         `json:"file_ids"`
+	Metadata       map[string]any   `json:"metadata"`
+}
+
+// https://platform.openai.com/docs/api-reference/runs/createRun
+type CreateRunRequest struct {
+	// https://platform.openai.com/docs/api-reference/runs/createRun#runs-createrun-thread_id
+	//
+	// Required.
+	ThreadID string `json:"-"`
+
+	// https://platform.openai.com/docs/api-reference/runs/createRun#runs-createrun-assistant_id
+	//
+	// Required.
+	AssistantID string `json:"assistant_id"`
+
+	// https://platform.openai.com/docs/api-reference/runs/createRun#runs-createrun-model
+	//
+	// Optional. Defaults to the model associated with the assistant.
+	Model string `json:"model,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/runs/createRun#runs-createrun-instructions
+	//
+	// Optional. Defaults to the instructions associated with the assistant.
+	Instructions string `json:"instructions,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/runs/createRun#runs-createrun-tools
+	//
+	// Optional. Defaults to the tools associated with the assistant.
+	Tools []map[string]any `json:"tools,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/runs/createRun#runs-createrun-metadata
+	//
+	// Optional.
+	Metadata map[string]any `json:"metadata,omitempty"`
+}
+
+// https://platform.openai.com/docs/api-reference/runs/createRun
+type CreateRunResponse = Run
+
+// https://platform.openai.com/docs/api-reference/runs/createRun
+func (c *Client) CreateRun(ctx context.Context, req *CreateRunRequest) (*CreateRunResponse, error) {
+	b, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/threads/"+req.ThreadID+"/runs", bytes.NewReader(b))
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+	defer resp.Body.Close()
+
+	var res CreateRunResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+	return &res, nil
+}
+
+// https://platform.openai.com/docs/api-reference/runs/object#runs/object-status
+type RunStatus = string
+
+const (
+	RunStatusQueued         RunStatus = "queued"
+	RunStatusInProgress     RunStatus = "in_progress"
+	RunStatusRequiresAction RunStatus = "requires_action"
+	RunStatusCancelling     RunStatus = "cancelling"
+	RunStatusCancelled      RunStatus = "cancelled"
+	RunStatusFailed         RunStatus = "failed"
+	RunStatusCompleted      RunStatus = "completed"
+	RunStatusExpired        RunStatus = "expired"
+)
+
+// https://platform.openai.com/docs/api-reference/runs/getRun
+type GetRunRequest struct {
+	// https://platform.openai.com/docs/api-reference/runs/getRun#runs-getrun-thread_id
+	//
+	// Required.
+	ThreadID string
+
+	// https://platform.openai.com/docs/api-reference/runs/getRun#runs-getrun-run_id
+	//
+	// Required.
+	RunID string
+}
+
+// https://platform.openai.com/docs/api-reference/runs/getRun
+type GetRunResponse = Run
+
+// https://platform.openai.com/docs/api-reference/runs/getRun
+func (c *Client) GetRun(ctx context.Context, req *GetRunRequest) (*GetRunResponse, error) {
+	r, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.openai.com/v1/threads/"+req.ThreadID+"/runs/"+req.RunID, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+	defer resp.Body.Close()
+
+	var res GetRunResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+	return &res, nil
+}
+
+// https://platform.openai.com/docs/api-reference/runs/modifyRun
+type UpdateRunRequest struct {
+	// https://platform.openai.com/docs/api-reference/runs/modifyRun#runs-modifyrun-thread_id
+	//
+	// Required.
+	ThreadID string `json:"-"`
+
+	// https://platform.openai.com/docs/api-reference/runs/modifyRun#runs-modifyrun-run_id
+	//
+	// Required.
+	RunID string `json:"-"`
+
+	// https://platform.openai.com/docs/api-reference/runs/modifyRun#runs-modifyrun-metadata
+	//
+	// Optional.
+	Metadata map[string]any `json:"metadata,omitempty"`
+}
+
+// https://platform.openai.com/docs/api-reference/runs/modifyRun
+type UpdateRunResponse = Run
+
+// https://platform.openai.com/docs/api-reference/runs/modifyRun
+func (c *Client) UpdateRun(ctx context.Context, req *UpdateRunRequest) (*UpdateRunResponse, error) {
+	b, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/threads/"+req.ThreadID+"/runs/"+req.RunID, bytes.NewReader(b))
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+	defer resp.Body.Close()
+
+	var res UpdateRunResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+	return &res, nil
+}
+
+// https://platform.openai.com/docs/api-reference/runs/listRuns
+type ListRunsRequest struct {
+	// https://platform.openai.com/docs/api-reference/runs/listRuns#runs-listruns-thread_id
+	//
+	// Required.
+	ThreadID string `json:"thread_id"`
+
+	// https://platform.openai.com/docs/api-reference/runs/listRuns#runs-listruns-limit
+	//
+	// Optional. Defaults to 20.
+	Limit int `json:"limit,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/runs/listRuns#runs-listruns-order
+	//
+	// Optional. Defaults to "desc".
+	Order string `json:"order,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/runs/listRuns#runs-listruns-after
+	//
+	// Optional.
+	After string `json:"after,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/runs/listRuns#runs-listruns-before
+	//
+	// Optional.
+	Before string `json:"before,omitempty"`
+}
+
+// https://platform.openai.com/docs/api-reference/runs/listRuns#runs-listruns-response
+type ListRunsResponse struct {
+	Data []Run `json:"data"`
+}
+
+type AssistantToolOutput struct {
+	CallID string `json:"tool_call_id,omitempty"`
+	Output string `json:"output,omitempty"`
+}
+
+// https://platform.openai.com/docs/api-reference/runs/submitToolOutputs
+type SubmitToolOutputsRequest struct {
+	// https://platform.openai.com/docs/api-reference/runs/submitToolOutputs#runs-submittooloutputs-thread_id
+	//
+	// Required.
+	ThreadID string `json:"-"`
+
+	// https://platform.openai.com/docs/api-reference/runs/submitToolOutputs#runs-submittooloutputs-run_id
+	//
+	// Required.
+	RunID string `json:"-"`
+
+	// https://platform.openai.com/docs/api-reference/runs/submitToolOutputs#runs-submittooloutputs-tool_id
+	//
+	// Required.
+	ToolOuputs []*AssistantToolOutput `json:"tool_outputs"`
+}
+
+// https://platform.openai.com/docs/api-reference/runs/submitToolOutputs
+type SubmitToolOutputsResponse = Run
+
+// https://platform.openai.com/docs/api-reference/runs/submitToolOutputs
+func (c *Client) SubmitToolOutputs(ctx context.Context, req *SubmitToolOutputsRequest) (*SubmitToolOutputsResponse, error) {
+	b, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/threads/"+req.ThreadID+"/runs/"+req.RunID+"/submit_tool_outputs", bytes.NewReader(b))
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+	defer resp.Body.Close()
+
+	var res SubmitToolOutputsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+	return &res, nil
+}
+
+// https://platform.openai.com/docs/api-reference/runs/cancelRun
+type CancelRunRequest struct {
+	// https://platform.openai.com/docs/api-reference/runs/cancelRun#runs-cancelrun-thread_id
+	//
+	// Required.
+	ThreadID string
+
+	// https://platform.openai.com/docs/api-reference/runs/cancelRun#runs-cancelrun-run_id
+	//
+	// Required.
+	RunID string
+}
+
+// https://platform.openai.com/docs/api-reference/runs/cancelRun
+func (c *Client) CancelRun(ctx context.Context, req *CancelRunRequest) error {
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/threads/"+req.ThreadID+"/runs/"+req.RunID+"/cancel", nil)
+	if err != nil {
+		return err
+	}
+
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		return fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+
+	return nil
+}
+
+// https://platform.openai.com/docs/api-reference/runs/createThreadAndRun#runs-createthreadandrun-thread
+type CreateThreadAndRunRequestInitialThreadMessage struct {
+	Role     string         `json:"role"`
+	Content  string         `json:"content"`
+	FilesIDs []string       `json:"file_ids,omitempty"`
+	Metadata map[string]any `json:"metadata,omitempty"`
+}
+
+type CreateThreadAndRunRequestInitialThread struct {
+	Messages []*CreateThreadAndRunRequestInitialThreadMessage `json:"messages,omitempty"`
+	Metadata map[string]any                                   `json:"metadata,omitempty"`
+}
+
+// https://platform.openai.com/docs/api-reference/runs/createThreadAndRun
+type CreateThreadAndRunRequest struct {
+	// https://platform.openai.com/docs/api-reference/runs/createThreadAndRun#runs-createthreadandrun-assistant_id
+	//
+	// Required.
+	AssistantID string `json:"assistant_id"`
+
+	// https://platform.openai.com/docs/api-reference/runs/createThreadAndRun#runs-createthreadandrun-thread
+	//
+	// Optional.
+	Thread *CreateThreadAndRunRequestInitialThread `json:"thread,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/runs/createThreadAndRun#runs-createthreadandrun-model
+	//
+	// Optional. Defaults to the model associated with the assistant.
+	Model string `json:"model,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/runs/createThreadAndRun#runs-createthreadandrun-instructions
+	//
+	// Optional. Defaults to the instructions associated with the assistant.
+	Instructions string `json:"instructions,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/runs/createThreadAndRun#runs-createthreadandrun-tools
+	//
+	// Optional. Defaults to the tools associated with the assistant.
+	Tools []map[string]any `json:"tools,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/runs/createThreadAndRun#runs-createthreadandrun-metadata
+	//
+	// Optional.
+	Metadata map[string]any `json:"metadata,omitempty"`
+}
+
+// https://platform.openai.com/docs/api-reference/runs/createThreadAndRun
+type CreateThreadAndRunResponse = Run
+
+// https://platform.openai.com/docs/api-reference/runs/createThreadAndRun
+func (c *Client) CreateThreadAndRun(ctx context.Context, req *CreateThreadAndRunRequest) (*CreateThreadAndRunResponse, error) {
+	b, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/threads/runs", bytes.NewReader(b))
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+
+	var res CreateThreadAndRunResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &res, nil
+}
+
+// https://platform.openai.com/docs/api-reference/runs/step-object
+type RunStep struct {
+	ID          string         `json:"id"`
+	Object      string         `json:"object"`
+	Created     int            `json:"created"`
+	AssistantID string         `json:"assistant_id"`
+	ThreadID    string         `json:"thread_id"`
+	RunID       string         `json:"run_id"`
+	Type        string         `json:"type"`
+	Status      string         `json:"status"`
+	StepDetails map[string]any `json:"step_details"`
+	LastError   map[string]any `json:"last_error,omitempty"`
+	ExpiredAt   int            `json:"expired_at,omitempty"`
+	CanceledAt  int            `json:"canceled_at,omitempty"`
+	FailedAt    int            `json:"failed_at,omitempty"`
+	CompletedAt int            `json:"completed_at,omitempty"`
+	Metadata    map[string]any `json:"metadata,omitempty"`
+}
+
+// https://platform.openai.com/docs/api-reference/runs/getRunStep
+type GetRunStepRequest struct {
+	// https://platform.openai.com/docs/api-reference/runs/getRunStep#runs-getrunstep-thread_id
+	//
+	// Required.
+	ThreadID string
+
+	// https://platform.openai.com/docs/api-reference/runs/getRunStep#runs-getrunstep-run_id
+	//
+	// Required.
+	RunID string
+
+	// https://platform.openai.com/docs/api-reference/runs/getRunStep#runs-getrunstep-step_id
+	//
+	// Required.
+	StepID string
+}
+
+// https://platform.openai.com/docs/api-reference/runs/getRunStep
+type GetRunStepResponse = RunStep
+
+// https://platform.openai.com/docs/api-reference/runs/getRunStep
+func (c *Client) GetRunStep(ctx context.Context, req *GetRunStepRequest) (*GetRunStepResponse, error) {
+	r, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.openai.com/v1/threads/"+req.ThreadID+"/runs/"+req.RunID+"/steps/"+req.StepID, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+	defer resp.Body.Close()
+
+	var res GetRunStepResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+	return &res, nil
+}
+
+// https://platform.openai.com/docs/api-reference/runs/listRunSteps
+type ListRunStepsRequest struct {
+	// https://platform.openai.com/docs/api-reference/runs/listRunSteps#runs-listrunsteps-thread_id
+	//
+	// Required.
+	ThreadID string
+
+	// https://platform.openai.com/docs/api-reference/runs/listRunSteps#runs-listrunsteps-run_id
+	//
+	// Required.
+	RunID string
+
+	// https://platform.openai.com/docs/api-reference/runs/listRunSteps#runs-listrunsteps-limit
+	//
+	// Optional. Defaults to 20.
+	Limit int
+
+	// https://platform.openai.com/docs/api-reference/runs/listRunSteps#runs-listrunsteps-order
+	//
+	// Optional. Defaults to "desc".
+	Order string
+
+	// https://platform.openai.com/docs/api-reference/runs/listRunSteps#runs-listrunsteps-after
+	//
+	// Optional.
+	After string
+
+	// https://platform.openai.com/docs/api-reference/runs/listRunSteps#runs-listrunsteps-before
+	//
+	// Optional.
+	Before string
+}
+
+// https://platform.openai.com/docs/api-reference/runs/listRunSteps
+type ListRunStepsResponse struct {
+	Data []RunStep `json:"data"`
+}
+
+// https://platform.openai.com/docs/api-reference/runs/listRunSteps
+func (c *Client) ListRunSteps(ctx context.Context, req *ListRunStepsRequest) (*ListRunStepsResponse, error) {
+	r, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.openai.com/v1/threads/"+req.ThreadID+"/runs/"+req.RunID+"/steps", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+	r.Header.Set("OpenAI-Beta", "assistants=v1")
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	q := r.URL.Query()
+
+	if req.Limit != 0 {
+		q.Set("limit", strconv.Itoa(req.Limit))
+	}
+
+	if req.Order != "" {
+		q.Set("order", req.Order)
+	}
+
+	if req.After != "" {
+		q.Set("after", req.After)
+	}
+
+	if req.Before != "" {
+		q.Set("before", req.Before)
+	}
+
+	r.URL.RawQuery = q.Encode()
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+	defer resp.Body.Close()
+
+	var res ListRunStepsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+	return &res, nil
+}
+
+// https://platform.openai.com/docs/api-reference/audio/createSpeech
+type CreateSpeechRequest struct {
+	// https://platform.openai.com/docs/api-reference/audio/createSpeech#audio-createspeech-model
+	//
+	// Required.
+	Model string `json:"model"`
+
+	// https://platform.openai.com/docs/api-reference/audio/createSpeech#audio-createspeech-input
+	//
+	// Required.
+	Input string `json:"input"`
+
+	// https://platform.openai.com/docs/api-reference/audio/createSpeech#audio-createspeech-voice
+	//
+	// Required.
+	Voice string `json:"voice,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/audio/createSpeech#audio-createspeech-response_format
+	//
+	// Optional. Defaults to "mp3".
+	ResponseFormat string `json:"response_format,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/audio/createSpeech#audio-createspeech-speed
+	//
+	// Optional. Defaults to 1.
+	Speed float64 `json:"speed,omitempty"`
+}
+
+// https://platform.openai.com/docs/api-reference/audio/createSpeech#audio-createspeech-response
+func (c *Client) CreateSpeech(ctx context.Context, req *CreateSpeechRequest) (io.ReadCloser, error) {
+	b, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/audio/speech", bytes.NewReader(b))
+	if err != nil {
+		return nil, err
+	}
+
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+c.APIKey)
+
+	if c.Organization != "" {
+		r.Header.Set("OpenAI-Organization", c.Organization)
+	}
+
+	resp, err := c.HTTPClient.Do(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		return nil, fmt.Errorf("unexpected status code: %d: %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
+	}
+
+	return resp.Body, nil
+}

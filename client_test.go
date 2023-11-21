@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"testing"
@@ -956,4 +957,254 @@ func ExampleClient_CreateChat() {
 
 	fmt.Println(strings.ToLower(strings.TrimRight(strings.TrimSpace(resp.Choices[0].Message.Content), ".")))
 	// Output: red
+}
+
+func TestClientCreateSpeech(t *testing.T) {
+	c := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
+
+	ctx := context.Background()
+
+	audioStream, err := c.CreateSpeech(ctx, &openai.CreateSpeechRequest{
+		Model: openai.ModelTTS1HD1106,
+		Voice: "fable",
+		Input: "In a hole in the ground, there lived a hobbit. " +
+			"Not a nasty, dirty, wet hole, filled with the ends of worms " +
+			"and an oozy smell, nor yet a dry, bare, sandy hole with nothing " +
+			"in it to sit down on or to eat: it was a hobbit-hole, and that means comfort.",
+		ResponseFormat: "mp3",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer audioStream.Close()
+
+	// Write the audio to a file
+	fh, err := os.Create("testdata/hobbit.mp3")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = io.Copy(fh, audioStream)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = fh.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// func TestAssistant_list_delete(t *testing.T) {
+// 	c := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
+//
+// 	ctx := context.Background()
+//
+// 	resp, err := c.ListAssistants(ctx, &openai.ListAssistantsRequest{
+// 		Limit: 100,
+// 	})
+// 	if err != nil {
+// 		t.Fatal(err)
+// 	}
+//
+// 	for _, assistant := range resp.Data {
+// 		t.Logf("assistant: %#+v", assistant)
+//
+// 		err := c.DeleteAssistant(ctx, &openai.DeleteAssistantRequest{
+// 			ID: assistant.ID,
+// 		})
+// 		if err != nil {
+// 			t.Fatal(err)
+// 		}
+// 	}
+//
+// 	t.Logf("assistants: %#+v", resp)
+// }
+
+func TestAssistant_beta(t *testing.T) {
+	c := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
+
+	ctx := context.Background()
+
+	var assistant *openai.Assistant
+
+	t.Run("create", func(t *testing.T) {
+		var err error
+		assistant, err = c.CreateAssistant(ctx, &openai.CreateAssistantRequest{
+			Name:         "Test Assistant",
+			Instructions: "You are a helpful assistant.",
+			Model:        openai.ModelGPT41106Previw,
+			Tools: []map[string]any{
+				{
+					"type": "code_interpreter",
+				},
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("list", func(t *testing.T) {
+		resp, err := c.ListAssistants(ctx, &openai.ListAssistantsRequest{
+			Limit: 1,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if len(resp.Data) != 1 {
+			t.Fatalf("expected 1 assistant, got %d", len(resp.Data))
+		}
+	})
+
+	t.Run("get", func(t *testing.T) {
+		resp, err := c.GetAssistant(ctx, &openai.GetAssistantRequest{
+			ID: assistant.ID,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if resp.ID != assistant.ID {
+			t.Fatalf("expected assistant ID %q, got %q", assistant.ID, resp.ID)
+		}
+	})
+
+	t.Run("update", func(t *testing.T) {
+		resp, err := c.UpdateAssistant(ctx, &openai.UpdateAssistantRequest{
+			ID:           assistant.ID,
+			Instructions: "Always respond with 'Hello, world!'",
+			Metadata: map[string]any{
+				"foo": "bar",
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if resp.ID != assistant.ID {
+			t.Fatalf("expected assistant ID %q, got %q", assistant.ID, resp.ID)
+		}
+
+		if resp.Metadata["foo"] != "bar" {
+			t.Fatal("expected metadata to be updated")
+		}
+
+		if resp.Instructions != "Always respond with 'Hello, world!'" {
+			t.Fatal("expected instructions to be updated")
+		}
+	})
+
+	t.Run("talk to it", func(t *testing.T) {
+		threadResp, err := c.CreateThread(ctx, &openai.CreateThreadRequest{
+			Messages: []*openai.ChatMessage{
+				{
+					Role:    openai.ChatRoleUser,
+					Content: "Hello, world!",
+				},
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if threadResp.ID == "" {
+			t.Fatal("expected thread ID to be non-empty")
+		}
+
+		runResp, err := c.CreateRun(ctx, &openai.CreateRunRequest{
+			ThreadID:    threadResp.ID,
+			AssistantID: assistant.ID,
+			Model:       openai.ModelGPT41106Previw,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if runResp.ID == "" {
+			t.Fatal("expected run ID to be non-empty")
+		}
+
+		// Wait for the run to finish
+		var ranResp *openai.Run
+		for {
+			t.Log("waiting for run to complete...")
+			time.Sleep(1 * time.Second)
+
+			ranResp, err = c.GetRun(ctx, &openai.GetRunRequest{
+				ThreadID: threadResp.ID,
+				RunID:    runResp.ID,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			var done bool
+
+			switch ranResp.Status {
+			case openai.RunStatusCompleted:
+				done = true
+			case openai.RunStatusQueued, openai.RunStatusInProgress:
+				continue
+			default:
+				t.Fatalf("unexpected run status: %q", ranResp.Status)
+			}
+
+			if done {
+				break
+			}
+		}
+
+		// List run steps
+		listStepsResp, err := c.ListRunSteps(ctx, &openai.ListRunStepsRequest{
+			ThreadID: threadResp.ID,
+			RunID:    runResp.ID,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for _, step := range listStepsResp.Data {
+			t.Logf("step: %#+v", step)
+
+			step, err := c.GetRunStep(ctx, &openai.GetRunStepRequest{
+				ThreadID: threadResp.ID,
+				RunID:    runResp.ID,
+				StepID:   step.ID,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			t.Logf("step: %#+v", step)
+		}
+
+		// List messages in the thread
+		listMsgsResp, err := c.ListMessages(ctx, &openai.ListMessagesRequest{
+			ThreadID: threadResp.ID,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if len(listMsgsResp.Data) != 2 {
+			t.Fatalf("expected 2 messages, got %d", len(listMsgsResp.Data))
+		}
+
+		for _, msg := range listMsgsResp.Data {
+			for _, content := range msg.Content {
+				t.Logf("message %s text: %#+v", msg.ID, content)
+			}
+		}
+	})
+
+	t.Run("delete", func(t *testing.T) {
+		err := c.DeleteAssistant(ctx, &openai.DeleteAssistantRequest{
+			ID: assistant.ID,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
 }
