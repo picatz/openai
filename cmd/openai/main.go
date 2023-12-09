@@ -718,9 +718,6 @@ func startAssistantChat(client *openai.Client, model string) error {
 
 	cls()
 
-	// Print a welcome message to explain how to use the chat mode.
-	// t.Write([]byte("Welcome to the OpenAI API CLI chat mode. Type '\033[2mdelete\033[0m' to forget last message. Type '\033[2mexit\033[0m' to quit.\n\n"))
-
 	// Autocomplete for commands.
 	t.AutoCompleteCallback = func(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
 		// If the user presses tab, then autocomplete the command.
@@ -767,8 +764,9 @@ func startAssistantChat(client *openai.Client, model string) error {
 		// Read up to line from STDIN.
 		input, err := t.ReadLine()
 		if err != nil {
-			bt.WriteString(err.Error())
-			bt.Flush()
+			if err == io.EOF {
+				return nil
+			}
 			return fmt.Errorf("failed to read line: %w", err)
 		}
 
