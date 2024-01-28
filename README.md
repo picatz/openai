@@ -20,8 +20,8 @@ $ go install github.com/picatz/openai/cmd/openai@latest
    <img src="./vhs/demo.gif"></img>
 </center>
 
-> **Note**
-> To use this package, you must have a valid OpenAI API key. You can get one [here](https://platform.openai.com/).
+> [!IMPORTANT] 
+> To use the CLI you must have a valid [OpenAI](https://openai.com/) API key set as the `OPENAI_API_KEY` environment variable. You can get one [here](https://platform.openai.com/).
 
 ## Usage
 
