@@ -31,6 +31,8 @@ import "github.com/picatz/openai"
 client := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
 ```
 
+### Assistants API
+
 ```go
 assistant, _ := client.CreateAssistant(ctx, &openai.CreateAssistantRequest{
 	Model:        openai.ModelGPT4TurboPreview,
@@ -73,6 +75,8 @@ listResp, _ := client.ListMessages(ctx, &openai.ListMessagesRequest{
 
 fmt.Println(listResp.Data[0].Content[0].Text())
 ```
+
+### Chat API
 
 ```go
 var history []openai.ChatMessage{
