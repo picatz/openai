@@ -333,9 +333,6 @@ func startAssistantChat(client *openai.Client, model string) error {
 				Purpose: "assistants",
 				Body:    fh,
 			})
-			defer client.DeleteFile(ctx, &openai.DeleteFileRequest{
-				ID: uploadResp.ID,
-			})
 
 			fh.Close()
 
@@ -343,6 +340,10 @@ func startAssistantChat(client *openai.Client, model string) error {
 				bt.WriteString(fmt.Sprintf("failed to upload file: %s\n", err))
 				continue
 			}
+
+			defer client.DeleteFile(ctx, &openai.DeleteFileRequest{
+				ID: uploadResp.ID,
+			})
 
 			bt.WriteString(fmt.Sprintf("uploaded file: %s\n", uploadResp.ID))
 
