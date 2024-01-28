@@ -1487,13 +1487,6 @@ func FunctionCallArgumentValue[T any](name string, args FunctionCallArguments) (
 	return v, nil
 }
 
-// Deprecated: Use FunctionCallArgumentValue instead.
-//
-// This function is deprecated and will be removed in a future release.
-func GetTypedFunctionCallArgumentValue[T any](name string, args FunctionCallArguments) (T, error) {
-	return FunctionCallArgumentValue[T](name, args)
-}
-
 // FunctionCall describes a function call.
 type FunctionCall struct {
 	Name      string                `json:"name"`
