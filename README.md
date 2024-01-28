@@ -1,6 +1,6 @@
 # OpenAI [![Go Reference](https://pkg.go.dev/badge/github.com/picatz/openai.svg)](https://pkg.go.dev/github.com/picatz/openai) [![Go Report Card](https://goreportcard.com/badge/github.com/picatz/openai)](https://goreportcard.com/report/github.com/picatz/openai) [![License: MPL 2.0](https://img.shields.io/badge/License-MPL_2.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0) 
  
-An unofficial community-maintained Go client package and CLI for OpenAI.
+An unofficial community-maintained Go client package and CLI for [OpenAI](https://openai.com/).
 
 ## Installation
 
@@ -21,7 +21,10 @@ $ go install github.com/picatz/openai/cmd/openai@latest
 </center>
 
 > [!IMPORTANT] 
-> To use the CLI you must have a valid [OpenAI](https://openai.com/) API key set as the `OPENAI_API_KEY` environment variable. You can get one [here](https://platform.openai.com/).
+> To use the CLI you must have a valid `OPENAI_API_KEY` environment variable set. You can get one [here](https://platform.openai.com/).
+
+> [!TIP]
+> You can customize which model is used by setting the `OPENAI_MODEL` environment variable. The default is `gpt-4-turbo-preview` today, but it may change in the future.
 
 ## Usage
 
