@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 )
 
 // Client is a client for the OpenAI API.
@@ -4205,4 +4206,38 @@ func (c *Client) CreateSpeech(ctx context.Context, req *CreateSpeechRequest) (io
 	}
 
 	return resp.Body, nil
+}
+
+// WaitForRun polls the API at the given inter until the run is completed, failed, cancelled, or expired.
+//
+// It returns nil if the run completed successfully, or an error if the run failed, was cancelled, or expired.
+func WaitForRun(ctx context.Context, client *Client, threadID, runID string, interval time.Duration) error {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			run, err := client.GetRun(ctx, &GetRunRequest{
+				ThreadID: threadID,
+				RunID:    runID,
+			})
+			if err != nil {
+				return err
+			}
+
+			switch run.Status {
+			case RunStatusCompleted:
+				return nil
+			case RunStatusFailed:
+				return fmt.Errorf("run %q failed: %v", runID, run.LastError)
+			case RunStatusCancelled:
+				return fmt.Errorf("run %q cancelled", runID)
+			case RunStatusExpired:
+				return fmt.Errorf("run %q expired", runID)
+			}
+		}
+	}
 }

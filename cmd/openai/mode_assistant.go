@@ -393,35 +393,9 @@ func startAssistantChat(client *openai.Client, model string) error {
 			return fmt.Errorf("failed to create run: %w", err)
 		}
 
-		// Wait for the run to complete.
-		// Wait for the run to finish
-		var ranResp *openai.Run
-		for {
-			// bt.WriteString(fmt.Sprintf("waiting for run to complete: %s\n", runResp.ID))
-			time.Sleep(700 * time.Millisecond)
-
-			ranResp, err = client.GetRun(ctx, &openai.GetRunRequest{
-				ThreadID: thread.ID,
-				RunID:    runResp.ID,
-			})
-			if err != nil {
-				return fmt.Errorf("failed to get run: %w", err)
-			}
-
-			var done bool
-
-			switch ranResp.Status {
-			case openai.RunStatusCompleted:
-				done = true
-			case openai.RunStatusQueued, openai.RunStatusInProgress:
-				continue
-			default:
-				return fmt.Errorf("unexpected run status: %s", ranResp.Status)
-			}
-
-			if done {
-				break
-			}
+		err = openai.WaitForRun(ctx, client, thread.ID, runResp.ID, 700*time.Millisecond)
+		if err != nil {
+			return fmt.Errorf("failed to wait for run: %w", err)
 		}
 
 		listResp, err := client.ListMessages(ctx, &openai.ListMessagesRequest{
