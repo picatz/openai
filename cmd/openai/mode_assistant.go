@@ -150,7 +150,7 @@ func startAssistantChat(client *openai.Client, model string) error {
 	// Move to left edge.
 	bt.WriteString("\033[0G")
 
-	bt.WriteString(styleWarning.Render("WARNING") + styleFaint.Render(": The messages and files uploaded during this session are ephemeral, and will not be available after exiting.\n\n"))
+	bt.WriteString(styleWarning.Render("WARNING") + styleFaint.Render(": Messages and files disappear after exiting.\n\n"))
 	bt.Flush()
 
 	for {
