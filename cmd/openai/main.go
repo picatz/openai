@@ -1,10 +1,8 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/charmbracelet/glamour"
 	"github.com/picatz/openai"
@@ -33,13 +31,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Check if STDIN is provided.
-	fi, err := os.Stdin.Stat()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s", err)
-		os.Exit(1)
-	}
-
 	// Get OpenAI client.
 	client := openai.NewClient(apiKey)
 
@@ -49,10 +40,6 @@ func main() {
 		mode = ModeChat
 	} else if len(args) == 1 && args[0] == "assistant" {
 		mode = ModeAssistant
-	} else if fi.Mode()&os.ModeCharDevice == 0 {
-		mode = ModeEdit
-	} else {
-		mode = ModeComplete
 	}
 
 	switch mode {
@@ -64,14 +51,6 @@ func main() {
 			fmt.Fprintf(os.Stderr, "%s", err)
 			os.Exit(1)
 		}
-	case ModeEdit:
-		ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
-		defer cancel()
-		startEditMode(ctx, client, args)
-	case ModeComplete:
-		ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
-		defer cancel()
-		startCompletionMode(ctx, client, args)
 	}
 }
 
