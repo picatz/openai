@@ -156,10 +156,16 @@ const (
 	// https://platform.openai.com/docs/guides/embeddings/embedding-models
 	ModelTextEmbeddingAda001 Model = "text-embedding-ada-001"
 
-	// This is the recommend model for nearly all embedding use cases.
+	// This is the previously recommend model for nearly all embedding use cases.
 	//
 	// https://openai.com/blog/new-and-improved-embedding-model
 	ModelTextEmbeddingAda002 Model = "text-embedding-ada-002"
+
+	// These models are the latest and greatest for embedding use cases.
+	//
+	// https://openai.com/blog/new-embedding-models-and-api-updates
+	ModelTextEmbedding3Small Model = "text-embedding-3-small"
+	ModelTextEmbedding3Large Model = "text-embedding-3-large"
 
 	// https://platform.openai.com/docs/api-reference/chat/create#chat/create-model
 	ModelGPT35Turbo             Model = "gpt-3.5-turbo"
@@ -170,6 +176,7 @@ const (
 	ModelGPT35Turbo16k0613      Model = "gpt-3.5-turbo-16k-0613"
 	ModelGPT35TurboInstruct     Model = "gpt-3.5-turbo-instruct"
 	ModelGPT35TurboInstruct0914 Model = "gpt-3.5-turbo-instruct-0914"
+	ModelGPT35Turbo0125         Model = "gpt-3.5-turbo-0125"
 
 	ModelGPT4              Model = "gpt-4"
 	ModelGPT40314          Model = "gpt-4-0314"
@@ -178,6 +185,8 @@ const (
 	ModelGPT432K0314       Model = "gpt-4-32k-0314"
 	ModelGPT41106Previw    Model = "gpt-4-1106-preview"
 	ModelGPT4VisionPreview Model = "gpt-4-vision-preview"
+	ModelGPT40125Preview   Model = "gpt-4-0125-preview"
+	ModelGPT4TurboPreview  Model = "gpt-4-turbo-preview"
 
 	ModelWhisper1 Model = "whisper-1"
 
@@ -185,6 +194,10 @@ const (
 	ModelTTS11106   Model = "tts-1-1106"
 	ModelTTS1HD     Model = "tts-1-hd"
 	ModelTTS1HD1106 Model = "tts-1-hd-1106"
+
+	ModelTextModeration007    Model = "text-moderation-007"
+	ModelTextModerationLatest Model = "text-moderation-latest"
+	ModelTextModerationStable Model = "text-moderation-stable"
 
 	// TODO: add more "known" models.
 )
