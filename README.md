@@ -119,7 +119,7 @@ $ go install github.com/picatz/openai/cmd/openai@latest
 * **Chat**: chat mode is enabled using the `chat` command line argument. This mode is not reccomended for most users.
 
 ```console
-$ openai chat
+$ openai assistant
 
 Welcome to the OpenAI API CLI assistant mode!
                                              
