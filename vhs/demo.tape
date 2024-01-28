@@ -11,7 +11,7 @@ Set Width 1200
 Set Height 600
 
 # Type a command in the terminal.
-Type "openai chat"
+Type "openai assistant"
 
 # Pause for dramatic effect.
 Sleep 500ms
@@ -22,17 +22,11 @@ Enter
 # Pause for dramatic effect.
 Sleep 500ms
 
-# Type a command in the terminal.
-Type "system: You are Jarvis, a helpful assistant."
-
 # Pause for dramatic effect.
 Sleep 500ms
 
-# Run the command by pressing enter.
-Enter
-
 # Type a command in the terminal.
-Type "Hello Jarvis, what is your name?"
+Type "Hello!"
 
 # Pause for dramatic effect.
 Sleep 500ms
@@ -44,10 +38,7 @@ Enter
 Sleep 2s
 
 # Type a command in the terminal.
-Type "er"
-
-# Tab complete the command.
-Tab@500ms 2
+Type "speak!"
 
 # Pause for dramatic effect.
 Sleep 500ms
@@ -55,11 +46,65 @@ Sleep 500ms
 # Run the command by pressing enter.
 Enter
 
+# Wait for the command to finish.
+Sleep 1s
+
+# Type a command in the terminal.
+Type "What is software engineering? Be as concise as possible."
+
+# Pause for dramatic effect.
+Sleep 500ms
+
+# Run the command by pressing enter.
+Enter
+
+# Wait for the command to finish.
+Sleep 20s
+
+# Type a command in the terminal.
+Type "upload /tmp/attention-is-all-you-need.pdf"
+
+# Pause for dramatic effect.
+Sleep 500ms
+
+# Run the command by pressing enter.
+Enter
+
+# Wait for the command to finish.
+Sleep 4s
+
+# Type a command in the terminal.
+Type "ls"
+
+# Pause for dramatic effect.
+Sleep 500ms
+
+# Run the command by pressing enter.
+Enter
+
+# Wait for the command to finish.
+Sleep 4s
+
+# Type a command in the terminal.
+Type "In the PDF I just uploaded, who is the first author listed?"
+
+# Pause for dramatic effect.
+Sleep 500ms
+
+# Run the command by pressing enter.
+Enter
+
+# Wait for the command to finish.
+Sleep 20s
+
 # Type a command in the terminal.
 Type "ex"
 
 # Tab complete the command.
 Tab@500ms 2
+
+# Pause for dramatic effect.
+Sleep 500ms
 
 # Run the command by pressing enter.
 Enter
