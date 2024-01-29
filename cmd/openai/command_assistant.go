@@ -99,12 +99,36 @@ var assistantFileDirectoryUploadCommand = &cobra.Command{
 			fmt.Println(resp.ID)
 		}
 
+		if cmd.Flag("assistants").Changed {
+			assistants, err := cmd.Flags().GetStringSlice("assistants")
+			if err != nil {
+				return fmt.Errorf("failed to get assistants flag: %w", err)
+			}
+
+			for _, assistantID := range assistants {
+				_, err := client.UpdateAssistant(ctx, &openai.UpdateAssistantRequest{
+					ID: assistantID,
+					FileIDs: func() []string {
+						var fileIDs []string
+						for _, resp := range uploadResps {
+							fileIDs = append(fileIDs, resp.ID)
+						}
+						return fileIDs
+					}(),
+				})
+				if err != nil {
+					return fmt.Errorf("failed to update assistant %q: %w", assistantID, err)
+				}
+			}
+		}
+
 		return nil
 	},
 }
 
 func init() {
 	assistantFileDirectoryUploadCommand.Flags().String("prefix", "", "the prefix to add to all file names (in front of root directory name)")
+	assistantFileDirectoryUploadCommand.Flags().StringSliceP("assistants", "a", nil, "the assistant IDs to update to use the uploaded file")
 }
 
 func uploadLocalFileForAssistants(ctx context.Context, name, path string) (*openai.UploadFileResponse, error) {
@@ -182,12 +206,32 @@ var assistantFileUploadCommand = &cobra.Command{
 
 		fmt.Println(uploadResp.ID)
 
+		if cmd.Flag("assistants").Changed {
+			assistants, err := cmd.Flags().GetStringSlice("assistants")
+			if err != nil {
+				return fmt.Errorf("failed to get assistants flag: %w", err)
+			}
+
+			for _, assistantID := range assistants {
+				_, err := client.UpdateAssistant(ctx, &openai.UpdateAssistantRequest{
+					ID: assistantID,
+					FileIDs: []string{
+						uploadResp.ID,
+					},
+				})
+				if err != nil {
+					return fmt.Errorf("failed to update assistant %q: %w", assistantID, err)
+				}
+			}
+		}
+
 		return nil
 	},
 }
 
 func init() {
 	assistantFileUploadCommand.Flags().String("name", "", "the name of the file")
+	assistantFileUploadCommand.Flags().StringSliceP("assistants", "a", nil, "the assistant IDs to update to use the uploaded file")
 
 	assistantFileUploadCommand.AddCommand(
 		assistantFileDirectoryUploadCommand,
@@ -391,12 +435,24 @@ var assistantUpdateCommand = &cobra.Command{
 			}
 		}
 
+		// Handle the files.
+		var fileIDs []string
+		{
+			filesFlag, err := cmd.Flags().GetStringSlice("files")
+			if err != nil {
+				return fmt.Errorf("failed to get files flag: %w", err)
+			}
+
+			fileIDs = filesFlag
+		}
+
 		_, err := client.UpdateAssistant(ctx, &openai.UpdateAssistantRequest{
 			ID:           args[0],
 			Instructions: cmd.Flag("instructions").Value.String(),
 			Name:         cmd.Flag("name").Value.String(),
 			Description:  cmd.Flag("description").Value.String(),
 			Tools:        tools,
+			FileIDs:      fileIDs,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to update assistant: %w", err)
@@ -412,6 +468,7 @@ func init() {
 	assistantUpdateCommand.Flags().String("description", "", "the description of the assistant")
 	assistantUpdateCommand.Flags().BoolP("code-interpreter", "c", true, "enable the code interpreter tool")
 	assistantUpdateCommand.Flags().BoolP("retrieval", "r", true, "enable the retrieval tool")
+	assistantUpdateCommand.Flags().StringSliceP("files", "f", nil, "the file IDs to use for the assistant")
 }
 
 var assistantDeleteCommand = &cobra.Command{
@@ -465,7 +522,8 @@ var assistantCreateCommand = &cobra.Command{
 			name         = cmd.Flag("name").Value.String()
 			description  = cmd.Flag("description").Value.String()
 
-			tools = []map[string]any{}
+			tools   []map[string]any
+			fileIDs []string
 		)
 
 		// Handle the tools.
@@ -483,12 +541,23 @@ var assistantCreateCommand = &cobra.Command{
 			}
 		}
 
+		// Handle the files.
+		{
+			filesFlag, err := cmd.Flags().GetStringSlice("files")
+			if err != nil {
+				return fmt.Errorf("failed to get files flag: %w", err)
+			}
+
+			fileIDs = filesFlag
+		}
+
 		assistant, err := client.CreateAssistant(ctx, &openai.CreateAssistantRequest{
 			Model:        model,
 			Instructions: instructions,
 			Name:         name,
 			Description:  description,
 			Tools:        tools,
+			FileIDs:      fileIDs,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create assistant: %w", err)
@@ -507,6 +576,7 @@ func init() {
 	assistantCreateCommand.Flags().String("description", "", "the description of the assistant")
 	assistantCreateCommand.Flags().Bool("code-interpreter", true, "enable the code interpreter tool")
 	assistantCreateCommand.Flags().Bool("retrieval", true, "enable the retrieval tool")
+	assistantCreateCommand.Flags().StringSliceP("files", "f", nil, "the file IDs to use for the assistant")
 }
 
 var assistantChatCommand = &cobra.Command{
@@ -622,6 +692,7 @@ func startAssistantChat(client *openai.Client, model, assistantID string) error 
 		})
 
 		assistantID = assistant.ID
+
 		ephemeralAssistant = true
 	}
 
@@ -661,7 +732,7 @@ func startAssistantChat(client *openai.Client, model, assistantID string) error 
 	// overwriting the prompt.
 	bt := bufio.NewWriter(t)
 
-	cls := func() {
+	clearScreen := func() {
 		// Clear the screen.
 		bt.WriteString("\033[2J")
 
@@ -672,7 +743,7 @@ func startAssistantChat(client *openai.Client, model, assistantID string) error 
 		bt.Flush()
 	}
 
-	cls()
+	clearScreen()
 
 	// Autocomplete for commands.
 	t.AutoCompleteCallback = func(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
@@ -764,7 +835,7 @@ func startAssistantChat(client *openai.Client, model, assistantID string) error 
 			continue
 		case "clear":
 			// Clear the screen.
-			cls()
+			clearScreen()
 			continue
 		case "ls":
 			listFilesResp, err := client.ListFiles(ctx, &openai.ListFilesRequest{})
@@ -847,9 +918,12 @@ func startAssistantChat(client *openai.Client, model, assistantID string) error 
 					Purpose: "assistants",
 					Body:    resp.Body,
 				})
-				defer client.DeleteFile(ctx, &openai.DeleteFileRequest{
-					ID: uploadResp.ID,
-				})
+
+				if ephemeralAssistant {
+					defer client.DeleteFile(ctx, &openai.DeleteFileRequest{
+						ID: uploadResp.ID,
+					})
+				}
 
 				resp.Body.Close()
 
@@ -932,7 +1006,7 @@ func startAssistantChat(client *openai.Client, model, assistantID string) error 
 			// Update the assistant instructions.
 			_, err := client.UpdateAssistant(ctx, &openai.UpdateAssistantRequest{
 				ID:           assistantID,
-				Instructions: input,
+				Instructions: strings.TrimPrefix(input, "system:"),
 			})
 			if err != nil {
 				return fmt.Errorf("failed to update assistant: %w", err)
