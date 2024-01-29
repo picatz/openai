@@ -26,20 +26,19 @@ func main() {
 	// Check if we have any arguments.
 	args := os.Args[1:]
 
-	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "No arguments provided")
-		os.Exit(1)
-	}
-
 	// Get OpenAI client.
 	client := openai.NewClient(apiKey)
 
-	// Identify mode.
+	// Identify mode, default to assistant.
 	var mode Mode
-	if len(args) == 1 && args[0] == "chat" {
-		mode = ModeChat
-	} else if len(args) == 1 && args[0] == "assistant" {
+	switch {
+	case len(args) == 0 || (len(args) == 1 && args[0] == "assistant"):
 		mode = ModeAssistant
+	case len(args) == 1 && args[0] == "chat":
+		mode = ModeChat
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown mode: %s\n", args[0])
+		os.Exit(1)
 	}
 
 	switch mode {
