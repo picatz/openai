@@ -113,6 +113,28 @@ Use OpenAI's chat or edit and completion features on the command-line.
 $ go install github.com/picatz/openai/cmd/openai@latest
 ```
 
+#### Usage
+
+```console
+$ openai --help
+OpenAI CLI
+
+Usage:
+  openai [flags]
+  openai [command]
+
+Available Commands:
+  assistant   Start an interactive assistant chat session
+  chat        Chat with the OpenAI API
+  completion  Generate the autocompletion script for the specified shell
+  help        Help about any command
+
+Flags:
+  -h, --help   help for openai
+
+Use "openai [command] --help" for more information about a command.
+```
+
 #### Modes
 
 * **Assistant**: assistant mode is enabled using the `assistant` command line argument, this is the mode you want to use.
@@ -131,6 +153,9 @@ Hello there! How may I assist you today?
 
 ...
 ```
+
+> [!TIP]
+> If no subcommand (like `assistant` or `chat`) is provided, the CLI will default to `assistant` mode.
 
 ```console
 $ openai chat

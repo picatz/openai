@@ -12,8 +12,19 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/picatz/openai"
+	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
+
+var chatCommand = &cobra.Command{
+	Use:   "chat",
+	Short: "Chat with the OpenAI API",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		startChat(client, model)
+
+		return nil
+	},
+}
 
 var cacheFilePath = os.Getenv("HOME") + "/.openai-cli-chat-cache"
 
