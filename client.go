@@ -692,11 +692,12 @@ func (c *Client) CreateModeration(ctx context.Context, req *CreateModerationRequ
 
 // https://platform.openai.com/docs/api-reference/files/list
 type ListFilesRequest struct {
-	// There are currently no parameters for this endpoint?
+	// https://platform.openai.com/docs/api-reference/files/list#files-list-purpose
+	//
+	// Optional. Filter to only list files with the specified purpose (assistants, fine-tune, etc).
+	Purpose string `json:"purpose,omitempty"`
 }
 
-// ListFilesResponse ...
-//
 // https://platform.openai.com/docs/api-reference/files/list
 type ListFilesResponse struct {
 	Data []struct {
