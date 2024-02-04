@@ -199,5 +199,8 @@ const (
 	ModelTextModerationLatest Model = "text-moderation-latest"
 	ModelTextModerationStable Model = "text-moderation-stable"
 
+	ModelDallE2 Model = "dall-e-2"
+	ModelDallE3 Model = "dall-e-3"
+
 	// TODO: add more "known" models.
 )
