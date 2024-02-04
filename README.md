@@ -136,11 +136,6 @@ Flags:
 Use "openai [command] --help" for more information about a command.
 ```
 
-#### Modes
-
-* **Assistant**: assistant mode is enabled using the `assistant` command line argument, this is the mode you want to use.
-* **Chat**: chat mode is enabled using the `chat` command line argument. This mode is not reccomended for most users.
-
 ```console
 $ openai assistant
 
