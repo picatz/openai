@@ -633,6 +633,10 @@ func init() {
 		assistantListCommand,
 		assistantFileCommand,
 	)
+
+	rootCmd.AddCommand(
+		assistantCommand,
+	)
 }
 
 // startAssistantChat starts an interactive chat session with the OpenAI API, this is a REPL-like

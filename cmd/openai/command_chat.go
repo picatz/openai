@@ -26,6 +26,12 @@ var chatCommand = &cobra.Command{
 	},
 }
 
+func init() {
+	rootCmd.AddCommand(
+		chatCommand,
+	)
+}
+
 var cacheFilePath = os.Getenv("HOME") + "/.openai-cli-chat-cache"
 
 // startChat starts an interactive chat session with the OpenAI API, this is a REPL-like

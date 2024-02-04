@@ -9,10 +9,3 @@ var rootCmd = &cobra.Command{
 		return startAssistantChat(client, model, "")
 	},
 }
-
-func init() {
-	rootCmd.AddCommand(
-		assistantCommand,
-		chatCommand,
-	)
-}
