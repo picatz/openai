@@ -440,6 +440,11 @@ type CreateImageRequest struct {
 	// Required. Max of 1,000 characters.
 	Prompt string `json:"prompt"`
 
+	// https://platform.openai.com/docs/api-reference/images/create#images-create-model
+	//
+	// Optional. Defaults to "dall-e-2".
+	Model string `json:"model,omitempty"`
+
 	// https://platform.openai.com/docs/api-reference/completions/create#completions/create-n
 	//
 	// Number of images to generate. Defaults to 1 if not specified. Most be between 1 and 10.
@@ -457,6 +462,16 @@ type CreateImageRequest struct {
 
 	// https://platform.openai.com/docs/api-reference/images/create#images/create-user
 	User string `json:"user,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/images/create#images-create-quality
+	//
+	// Optional. Either "standard" or "hd", defaults to "standard".
+	Quality string `json:"quality,omitempty"`
+
+	// https://platform.openai.com/docs/api-reference/images/create#images-create-style
+	//
+	// Optional. Either "vivid" or "natural", defaults to "vivid". Only valid for "dall-e-3" model.
+	Style string `json:"style,omitempty"`
 }
 
 // CreateImageResponse ...
@@ -466,6 +481,10 @@ type CreateImageResponse struct {
 		// One of the following: "url" or "b64_json"
 		URL     *string `json:"url"`
 		B64JSON *string `json:"b64_json"`
+
+		// If there were any prompt revisions made by the API.
+		// Use this to refine further.
+		RevisedPrompt *string `json:"revised_prompt"`
 	} `json:"data"`
 }
 
