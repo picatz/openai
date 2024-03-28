@@ -2673,7 +2673,7 @@ type CreateAssistantFileRequest struct {
 	// https://platform.openai.com/docs/api-reference/assistants/createAssistantFile#assistants-createassistantfile-file
 	//
 	// Required.
-	FileID string `json:"file"`
+	FileID string `json:"file_id"`
 }
 
 // https://platform.openai.com/docs/api-reference/assistants/createAssistantFile#assistants-createassistantfile-response
