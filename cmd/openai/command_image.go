@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/charmbracelet/glamour"
-	"github.com/picatz/openai"
+	"github.com/openai/openai-go"
 	"github.com/spf13/cobra"
 )
 
@@ -19,33 +19,33 @@ var imageCommand = &cobra.Command{
 		quality := cmd.Flag("quality").Value.String()
 		style := cmd.Flag("style").Value.String()
 		size := cmd.Flag("size").Value.String()
-		n, err := cmd.Flags().GetInt("n")
+		n, err := cmd.Flags().GetInt64("n")
 		if err != nil {
 			return err
 		}
 
-		resp, err := client.CreateImage(cmd.Context(), &openai.CreateImageRequest{
-			Prompt:  prompt,
-			Model:   model,
-			N:       n,
-			Quality: quality,
-			Size:    size,
-			Style:   style,
+		resp, err := client.Images.Generate(cmd.Context(), openai.ImageGenerateParams{
+			Prompt:  openai.F(prompt),
+			Model:   openai.F(model),
+			N:       openai.F(n),
+			Quality: openai.F(openai.ImageGenerateParamsQuality(quality)),
+			Style:   openai.F(openai.ImageGenerateParamsStyle(style)),
+			Size:    openai.F(openai.ImageGenerateParamsSize(size)),
 		})
 		if err != nil {
 			return err
 		}
 
 		for _, data := range resp.Data {
-			if data.RevisedPrompt != nil {
-				rp, err := glamour.Render(*data.RevisedPrompt, "dark")
+			if data.JSON.RevisedPrompt.IsNull() {
+				rp, err := glamour.Render(data.RevisedPrompt, "dark")
 				if err != nil {
 					return err
 				}
 				fmt.Println(rp)
 			}
 
-			fmt.Println(*data.URL)
+			fmt.Println(data.URL)
 		}
 
 		return nil
@@ -55,9 +55,9 @@ var imageCommand = &cobra.Command{
 func init() {
 	imageCommand.Flags().String("quality", "hd", "image quality")
 	imageCommand.Flags().String("style", "vivid", "image style")
-	imageCommand.Flags().String("model", openai.ModelDallE3, "model to use")
+	imageCommand.Flags().String("model", openai.ImageModelDallE3, "model to use")
 	imageCommand.Flags().String("size", "1792x1024", "image size")
-	imageCommand.Flags().Int("n", 1, "number of images to generate")
+	imageCommand.Flags().Int64("n", 1, "number of images to generate")
 
 	rootCmd.AddCommand(imageCommand)
 }
