@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/picatz/openai"
+	"github.com/openai/openai-go"
+	"github.com/openai/openai-go/option"
 )
 
 var (
@@ -21,15 +22,14 @@ func init() {
 	}
 
 	if model == "" {
-		model = openai.ModelGPT4TurboPreview
+		model = openai.ChatModelGPT4o
 	}
 
-	client = openai.NewClient(apiKey)
+	client = openai.NewClient(option.WithAPIKey(apiKey))
 }
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }

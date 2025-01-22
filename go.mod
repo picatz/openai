@@ -1,15 +1,17 @@
 module github.com/picatz/openai
 
-go 1.19
+go 1.21
+
+toolchain go1.23.4
 
 require (
 	github.com/charmbracelet/glamour v0.6.0
 	github.com/charmbracelet/lipgloss v0.8.0
 	github.com/ebitengine/oto/v3 v3.1.0
 	github.com/hajimehoshi/go-mp3 v0.3.4
+	github.com/openai/openai-go v0.1.0-alpha.45
 	github.com/spf13/cobra v1.8.0
-	golang.org/x/term v0.15.0
-	golang.org/x/time v0.5.0
+	golang.org/x/term v0.22.0
 )
 
 require (
@@ -32,8 +34,12 @@ require (
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/testify v1.8.4 // indirect
+	github.com/tidwall/gjson v1.14.4 // indirect
+	github.com/tidwall/match v1.1.1 // indirect
+	github.com/tidwall/pretty v1.2.1 // indirect
+	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/yuin/goldmark v1.5.6 // indirect
 	github.com/yuin/goldmark-emoji v1.0.2 // indirect
-	golang.org/x/net v0.19.0 // indirect
-	golang.org/x/sys v0.15.0 // indirect
+	golang.org/x/net v0.27.0 // indirect
+	golang.org/x/sys v0.22.0 // indirect
 )

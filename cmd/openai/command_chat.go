@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/picatz/openai"
+	"github.com/openai/openai-go"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -34,12 +34,20 @@ func init() {
 
 var cacheFilePath = os.Getenv("HOME") + "/.openai-cli-chat-cache"
 
+func newMessageUnion(messages []openai.ChatCompletionMessage) []openai.ChatCompletionMessageParamUnion {
+	msgUnion := make([]openai.ChatCompletionMessageParamUnion, len(messages))
+	for i, m := range messages {
+		msgUnion[i] = m
+	}
+	return msgUnion
+}
+
 // startChat starts an interactive chat session with the OpenAI API, this is a REPL-like
 // command-line program that allows you to chat with the API.
 func startChat(client *openai.Client, model string) {
 
 	// Keep track of the chat messages, both from the user and the API.
-	messages := []openai.ChatMessage{}
+	messages := []openai.ChatCompletionMessage{}
 
 	// Open cache file from users home directory.
 	f, err := os.OpenFile(cacheFilePath, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
@@ -64,7 +72,7 @@ func startChat(client *openai.Client, model string) {
 		os.Exit(1)
 	}
 
-	var systemMessage openai.ChatMessage
+	var systemMessage openai.ChatCompletionMessage
 
 	// Set the terminal to raw mode.
 	oldState, err := term.MakeRaw(0)
@@ -106,7 +114,7 @@ func startChat(client *openai.Client, model string) {
 
 	cls()
 
-	tokens := 0
+	tokens := int64(0)
 
 	// Print a welcome message to explain how to use the chat mode.
 	// t.Write([]byte("Welcome to the OpenAI API CLI chat mode. Type '\033[2mdelete\033[0m' to forget last message. Type '\033[2mexit\033[0m' to quit.\n\n"))
@@ -156,7 +164,7 @@ func startChat(client *openai.Client, model string) {
 			"messages: " + numberColor.Render(fmt.Sprintf("%d", len(messages))) + " " +
 			"tokens: " + numberColor.Render(fmt.Sprintf("%d", tokens)) +
 			styleBold.Render(")") +
-			" > "))
+			" ‣ "))
 
 		// Flush the buffer to the terminal.
 		bt.Flush()
@@ -184,7 +192,7 @@ func startChat(client *openai.Client, model string) {
 		// Check if the user wants to erase the whole chat.
 		if strings.TrimSpace(input) == "erase" {
 			// Reset the messages.
-			messages = []openai.ChatMessage{}
+			messages = []openai.ChatCompletionMessage{}
 			tokens = 0
 			continue
 		}
@@ -232,8 +240,8 @@ func startChat(client *openai.Client, model string) {
 		// way to add some context to the chat session for a CLI program.
 		if strings.HasPrefix(input, "system:") {
 			// Add the system message to the messages.
-			systemMessage = openai.ChatMessage{
-				Role:    openai.ChatRoleSystem,
+			systemMessage = openai.ChatCompletionMessage{
+				Role:    openai.ChatCompletionMessageRole(openai.ChatCompletionMessageParamRoleSystem),
 				Content: input,
 			}
 			messages = append(messages, systemMessage)
@@ -244,8 +252,8 @@ func startChat(client *openai.Client, model string) {
 		}
 
 		// Add the user input to the messages.
-		messages = append(messages, openai.ChatMessage{
-			Role:    openai.ChatRoleUser,
+		messages = append(messages, openai.ChatCompletionMessage{
+			Role:    openai.ChatCompletionMessageRole(openai.ChatCompletionMessageParamRoleUser),
 			Content: input,
 		})
 
@@ -291,11 +299,11 @@ func startChat(client *openai.Client, model string) {
 			bt.WriteString("\n")
 
 			// Reset the messages to the summary.
-			messages = []openai.ChatMessage{}
+			messages = []openai.ChatCompletionMessage{}
 
 			// Add the summary to the messages.
-			messages = append(messages, openai.ChatMessage{
-				Role:    openai.ChatRoleSystem,
+			messages = append(messages, openai.ChatCompletionMessage{
+				Role:    openai.ChatCompletionMessageRole(openai.ChatCompletionMessageParamRoleSystem),
 				Content: "Summary of previous messages for context: " + summary,
 			})
 
@@ -329,7 +337,7 @@ func startChat(client *openai.Client, model string) {
 	}
 }
 
-func chatRequest(client *openai.Client, model string, messages []openai.ChatMessage) (*openai.CreateChatResponse, error) {
+func chatRequest(client *openai.Client, model string, messages []openai.ChatCompletionMessage) (*openai.ChatCompletion, error) {
 	// Wait maxiumum of 5 minutes for a response, which provides
 	// a lot of time for the API to respond, but it should a matter
 	// of seconds, not minutes.
@@ -337,10 +345,10 @@ func chatRequest(client *openai.Client, model string, messages []openai.ChatMess
 	defer cancel()
 
 	// Create completion request.
-	resp, err := client.CreateChat(ctx, &openai.CreateChatRequest{
-		Model:     model,
-		Messages:  messages,
-		MaxTokens: 2048,
+	resp, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+		Model:     openai.F(model),
+		Messages:  openai.F(newMessageUnion(messages)),
+		MaxTokens: openai.F(int64(2048)),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create chat: %w", err)
@@ -354,14 +362,14 @@ func reqCtx(timeout time.Duration) (context.Context, context.CancelFunc) {
 }
 
 // summarizeMessages summarizes the messages using the OpenAI API.
-func summarizeMessages(client *openai.Client, model string, messages []openai.ChatMessage, attempts int) (string, int) {
+func summarizeMessages(client *openai.Client, model string, messages []openai.ChatCompletionMessage, attempts int) (string, int64) {
 	// Create a context with a timeout of 5 minutes.
 	ctx, cancel := reqCtx(5 * time.Minute)
 	defer cancel()
 
-	summaryMsgs := []openai.ChatMessage{
+	summaryMsgs := []openai.ChatCompletionMessage{
 		{
-			Role: openai.ChatRoleSystem,
+			Role: openai.ChatCompletionMessageRole(openai.ChatCompletionMessageParamRoleSystem),
 			Content: strings.Join(
 				[]string{
 					"You are an expert at summarizing conversations.",
@@ -378,10 +386,10 @@ func summarizeMessages(client *openai.Client, model string, messages []openai.Ch
 	b := strings.Builder{}
 
 	for _, m := range messages {
-		if m.Role == openai.ChatRoleSystem {
+		if m.Role == openai.ChatCompletionMessageRole(openai.ChatCompletionMessageParamRoleSystem) {
 			continue
 		}
-		if m.Role == openai.ChatRoleUser {
+		if m.Role == openai.ChatCompletionMessageRole(openai.ChatCompletionMessageParamRoleUser) {
 			b.WriteString("User: ")
 		} else {
 			b.WriteString("Bot: ")
@@ -390,8 +398,8 @@ func summarizeMessages(client *openai.Client, model string, messages []openai.Ch
 		b.WriteString("\n\n")
 	}
 
-	summaryMsgs = append(summaryMsgs, openai.ChatMessage{
-		Role:    openai.ChatRoleUser,
+	summaryMsgs = append(summaryMsgs, openai.ChatCompletionMessage{
+		Role:    openai.ChatCompletionMessageRole(openai.ChatCompletionMessageParamRoleUser),
 		Content: b.String(),
 	})
 
@@ -399,10 +407,10 @@ func summarizeMessages(client *openai.Client, model string, messages []openai.Ch
 	attempts++
 
 	// Create completion request.
-	resp, err := client.CreateChat(ctx, &openai.CreateChatRequest{
-		Model:     model,
-		Messages:  summaryMsgs,
-		MaxTokens: 1024,
+	resp, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+		Model:     openai.F(model),
+		Messages:  openai.F(newMessageUnion(summaryMsgs)),
+		MaxTokens: openai.F(int64(2048)),
 	})
 	if err != nil {
 		// TODO: This is a hack to handle the 429 error. We should handle this better.
