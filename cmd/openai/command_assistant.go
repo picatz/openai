@@ -798,7 +798,7 @@ func startAssistantChat(client *openai.Client, model, assistantID, threadID stri
 		bt.WriteString("\033[0G")
 
 		// Print the prompt.
-		bt.WriteString("> ")
+		bt.WriteString("‣ ")
 
 		// Flush the buffer to the terminal.
 		bt.Flush()

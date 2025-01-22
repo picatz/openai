@@ -164,7 +164,7 @@ func startChat(client *openai.Client, model string) {
 			"messages: " + numberColor.Render(fmt.Sprintf("%d", len(messages))) + " " +
 			"tokens: " + numberColor.Render(fmt.Sprintf("%d", tokens)) +
 			styleBold.Render(")") +
-			" > "))
+			" ‣ "))
 
 		// Flush the buffer to the terminal.
 		bt.Flush()
