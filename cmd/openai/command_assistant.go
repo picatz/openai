@@ -500,9 +500,61 @@ func init() {
 	assistantCreateCommand.Flags().StringSliceP("files", "f", nil, "the file IDs to use for the assistant")
 }
 
+var assistantChatThreadCommand = &cobra.Command{
+	Use: "thread",
+}
+
+var assistantChatThreadDeleteCommand = &cobra.Command{
+	Use:   "delete <thread-id>",
+	Short: "Delete an assistant chat thread",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := cmd.Context()
+
+		resp, err := client.Beta.Threads.Delete(ctx, args[0])
+		if err != nil {
+			return fmt.Errorf("failed to delete assistant chat thread: %w", err)
+		}
+
+		if !resp.Deleted {
+			return fmt.Errorf("failed to delete assistant chat thread: %s", resp.ID)
+		}
+
+		return nil
+	},
+}
+
+var assistantChatThreadInfoCommand = &cobra.Command{
+	Use:   "info <thread-id>",
+	Short: "Get information about an assistant chat thread",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := cmd.Context()
+
+		thread, err := client.Beta.Threads.Get(ctx, args[0])
+		if err != nil {
+			return fmt.Errorf("failed to get assistant chat thread: %w", err)
+		}
+
+		b, err := json.Marshal(thread)
+		if err != nil {
+			return fmt.Errorf("failed to marshal thread: %w", err)
+		}
+		b = append(b, '\n')
+
+		_, err = cmd.OutOrStdout().Write(b)
+		if err != nil {
+			return fmt.Errorf("failed to write thread: %w", err)
+		}
+
+		return nil
+	},
+}
+
 var assistantChatCommand = &cobra.Command{
 	Use:   "chat [assistant-id]",
 	Short: "Start an interactive assistant chat session",
+	Args:  cobra.MaximumNArgs(1),
 	Long: `Start an interactive ephemeral chat session with the OpenAI API.
 
 This is similar to the basic "openai assistant" command, but enables
@@ -517,11 +569,25 @@ answer questions, perform tasks, and even generate code.
 		if len(args) == 1 {
 			assistantID := args[0]
 
-			return startAssistantChat(client, model, assistantID, "")
+			var threadID string
+			if cmd.Flag("thread").Value.String() != "" {
+				threadID = cmd.Flag("thread").Value.String()
+			}
+
+			return startAssistantChat(client, model, assistantID, threadID)
 		}
 
 		return startAssistantChat(client, model, "", "")
 	},
+}
+
+func init() {
+	assistantChatCommand.Flags().String("model", model, "the model to use for the assistant")
+	assistantChatCommand.Flags().StringP("thread", "t", "", "the thread ID to use for the assistant")
+
+	assistantChatCommand.AddCommand(assistantChatThreadCommand)
+	assistantChatThreadCommand.AddCommand(assistantChatThreadDeleteCommand)
+	assistantChatThreadCommand.AddCommand(assistantChatThreadInfoCommand)
 }
 
 var assistantCommand = &cobra.Command{
@@ -619,7 +685,6 @@ func startAssistantChat(client *openai.Client, model, assistantID, threadID stri
 		ephemeralAssistant = true
 	}
 
-	var newThread bool
 	if threadID == "" {
 		thread, err := client.Beta.Threads.New(ctx, openai.BetaThreadNewParams{})
 		if err != nil {
@@ -628,8 +693,12 @@ func startAssistantChat(client *openai.Client, model, assistantID, threadID stri
 		if ephemeralAssistant {
 			defer client.Beta.Threads.Delete(ctx, thread.ID)
 		}
-		newThread = true
 		threadID = thread.ID
+	} else {
+		_, err = client.Beta.Threads.Get(ctx, threadID)
+		if err != nil {
+			return fmt.Errorf("failed to get thread: %w", err)
+		}
 	}
 
 	// Set the terminal to raw mode.
@@ -710,13 +779,18 @@ func startAssistantChat(client *openai.Client, model, assistantID, threadID stri
 		// Move to left edge.
 		bt.WriteString("\033[0G")
 
-		// Print assistant ID.
-		bt.WriteString("Assistant ID: " + styleBold.Render(assistantID) + "\n\n")
+		// Print assistant ID and thread ID.
+
+		bt.WriteString(fmt.Sprintf("%s Assistant %s chat thread %s session started.\n\n", styleSuccess.Render("▪"), styleBold.Render(assistantID), styleBold.Render(threadID)))
 		bt.Flush()
 	}
 
-	if !ephemeralAssistant && newThread {
-		defer bt.WriteString("Assistant chat thread ID: " + threadID + "\n\n")
+	if !ephemeralAssistant {
+		defer func() {
+			bt.WriteString("\033[0G")
+			bt.WriteString(fmt.Sprintf("\n%s Assistant %s chat thread %s session ended.\n\n", styleInfo.Render("▪"), styleBold.Render(assistantID), styleBold.Render(threadID)))
+			bt.Flush()
+		}()
 	}
 
 	for {
@@ -844,22 +918,21 @@ func startAssistantChat(client *openai.Client, model, assistantID, threadID stri
 					bt.WriteString(fmt.Sprintf("failed to download file: %s\n", err))
 					continue
 				}
-				defer resp.Body.Close()
 
 				uploadResp, err := client.Files.New(ctx, openai.FileNewParams{
 					File:    openai.FileParam(resp.Body, fields[1], resp.Header.Get("Content-Type")),
 					Purpose: openai.F(openai.FilePurposeAssistants),
 				})
 
-				if ephemeralAssistant {
-					defer client.Files.Delete(ctx, uploadResp.ID)
-				}
-
 				resp.Body.Close()
 
 				if err != nil {
 					bt.WriteString(fmt.Sprintf("failed to upload file: %s\n", err))
 					continue
+				}
+
+				if ephemeralAssistant {
+					defer client.Files.Delete(ctx, uploadResp.ID)
 				}
 
 				bt.WriteString(fmt.Sprintf("uploaded URL content: %s\n", uploadResp.ID))
