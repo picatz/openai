@@ -136,15 +136,24 @@ func init() {
 	assistantFileDirectoryUploadCommand.Flags().StringSliceP("assistants", "a", nil, "the assistant IDs to update to use the uploaded file")
 }
 
-func uploadLocalFileForAssistants(ctx context.Context, vectorStoreID, path string) (*openai.FileObject, error) {
+func uploadLocalFileForAssistants(ctx context.Context, name, path string) (*openai.FileObject, error) {
 	fh, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file %q: %w", path, err)
 	}
 	defer fh.Close()
 
+	// Determine the content type mime type of the file.
+	b := make([]byte, 512)
+	_, err = fh.Read(b)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file %q: %w", path, err)
+	}
+	fh.Seek(0, io.SeekStart)
+	contentType := http.DetectContentType(b)
+
 	uploadResp, err := client.Files.New(ctx, openai.FileNewParams{
-		File:    openai.F[io.Reader](fh),
+		File:    openai.FileParam(fh, name, contentType),
 		Purpose: openai.F(openai.FilePurposeAssistants),
 	})
 	if err != nil {
@@ -154,7 +163,7 @@ func uploadLocalFileForAssistants(ctx context.Context, vectorStoreID, path strin
 	return uploadResp, nil
 }
 
-func uploadHTTPFileForAssistants(ctx context.Context, httpClient *http.Client, vectorStoreID, url string) (*openai.FileObject, error) {
+func uploadHTTPFileForAssistants(ctx context.Context, httpClient *http.Client, url string) (*openai.FileObject, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -187,9 +196,12 @@ var assistantFileUploadCommand = &cobra.Command{
 		path := args[0]
 
 		name := cmd.Flag("name").Value.String()
+		if name == "" {
+			name = filepath.Base(path)
+		}
 
 		if strings.HasPrefix(path, "https://") || strings.HasPrefix(path, "http://") {
-			uploadResp, err := uploadHTTPFileForAssistants(ctx, http.DefaultClient, name, path)
+			uploadResp, err := uploadHTTPFileForAssistants(ctx, http.DefaultClient, path)
 			if err != nil {
 				return fmt.Errorf("failed to upload file: %w", err)
 			}
@@ -205,33 +217,12 @@ var assistantFileUploadCommand = &cobra.Command{
 
 		fmt.Println(uploadResp.ID)
 
-		if cmd.Flag("assistants").Changed {
-			assistants, err := cmd.Flags().GetStringSlice("assistants")
-			if err != nil {
-				return fmt.Errorf("failed to get assistants flag: %w", err)
-			}
-
-			for _, assistantID := range assistants {
-				_, err := client.Beta.Assistants.Update(ctx, assistantID, openai.BetaAssistantUpdateParams{
-					ToolResources: openai.F(openai.BetaAssistantUpdateParamsToolResources{
-						FileSearch: openai.F(openai.BetaAssistantUpdateParamsToolResourcesFileSearch{
-							VectorStoreIDs: openai.F([]string{uploadResp.ID}),
-						}),
-					}),
-				})
-				if err != nil {
-					return fmt.Errorf("failed to update assistant %q: %w", assistantID, err)
-				}
-			}
-		}
-
 		return nil
 	},
 }
 
 func init() {
 	assistantFileUploadCommand.Flags().String("name", "", "the name of the file")
-	assistantFileUploadCommand.Flags().StringSliceP("assistants", "a", nil, "the assistant IDs to update to use the uploaded file")
 
 	assistantFileUploadCommand.AddCommand(
 		assistantFileDirectoryUploadCommand,
@@ -245,89 +236,47 @@ var assistantFileDeleteAllCommand = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		// Function to recursively delete files in vector stores
-		var deleteFilesRecursive func(vectorStoreID string) error
-		deleteFilesRecursive = func(vectorStoreID string) error {
-			listResp, err := client.Files.List(ctx, openai.FileListParams{
-				Limit:   openai.Int(10_000),
-				Purpose: openai.String(string(openai.FileObjectPurposeAssistants)),
-			})
+		listResp, err := client.Files.List(ctx, openai.FileListParams{
+			Limit:   openai.Int(10_000),
+			Purpose: openai.String(string(openai.FileObjectPurposeAssistants)),
+		})
+		if err != nil {
+			return fmt.Errorf("failed to list files: %w", err)
+		}
+
+		deleteFile := func(fileID string) error {
+			resp, err := client.Files.Delete(ctx, fileID)
 			if err != nil {
-				return fmt.Errorf("failed to list files from vector store %s: %w", vectorStoreID, err)
+				return fmt.Errorf("failed to delete file %s: %w", fileID, err)
 			}
 
-			deleteFile := func(fileID string) error {
-				resp, err := client.Beta.VectorStores.Files.Delete(
-					ctx,
-					vectorStoreID,
-					fileID,
-				)
-				if err != nil {
-					return fmt.Errorf("failed to delete file from vector store %s: %w", vectorStoreID, err)
-				}
-
-				if resp.Deleted {
-					fmt.Printf("vector store %s file %s deleted\n", vectorStoreID, resp.ID)
-				}
-
-				return nil
-			}
-
-			for _, file := range listResp.Data {
-				err := deleteFile(file.ID)
-				if err != nil {
-					return fmt.Errorf("failed to delete file from vector store %s: %w", vectorStoreID, err)
-				}
-			}
-
-			for {
-				listResp, err = listResp.GetNextPage()
-				if err != nil {
-					return fmt.Errorf("failed to get next page of files from vector store %s: %w", vectorStoreID, err)
-				}
-				if listResp == nil {
-					break
-				}
-
-				for _, file := range listResp.Data {
-					err := deleteFile(file.ID)
-					if err != nil {
-						return fmt.Errorf("failed to delete file from vector store %s: %w", vectorStoreID, err)
-					}
-				}
+			if resp.Deleted {
+				fmt.Printf("file %s deleted\n", fileID)
 			}
 
 			return nil
 		}
 
-		// List all vector stores
-		resp, err := client.Beta.VectorStores.List(ctx, openai.BetaVectorStoreListParams{
-			Limit: openai.Int(100),
-		})
-		if err != nil {
-			return fmt.Errorf("failed to list vector stores: %w", err)
-		}
-
-		// Process each vector store
-		for _, vectorStore := range resp.Data {
-			if err := deleteFilesRecursive(vectorStore.ID); err != nil {
-				return err
-			}
-		}
-
-		// Handle pagination for vector stores
-		for {
-			resp, err = resp.GetNextPage()
+		for _, file := range listResp.Data {
+			err := deleteFile(file.ID)
 			if err != nil {
-				return fmt.Errorf("failed to get next page of vector stores: %w", err)
+				return fmt.Errorf("failed to delete file %s: %w", file.ID, err)
 			}
-			if resp == nil {
+		}
+
+		for {
+			listResp, err = listResp.GetNextPage()
+			if err != nil {
+				return fmt.Errorf("failed to get next page of files: %w", err)
+			}
+			if listResp == nil {
 				break
 			}
 
-			for _, vectorStore := range resp.Data {
-				if err := deleteFilesRecursive(vectorStore.ID); err != nil {
-					return err
+			for _, file := range listResp.Data {
+				err := deleteFile(file.ID)
+				if err != nil {
+					return fmt.Errorf("failed to delete file %s: %w", file.ID, err)
 				}
 			}
 		}
@@ -388,30 +337,6 @@ var assistantFileInfoCommand = &cobra.Command{
 	},
 }
 
-var assistantFileReadCommand = &cobra.Command{
-	Use:   "read <file-id>",
-	Short: "Read an assistant file",
-	Args:  cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := cmd.Context()
-
-		fileId := args[0]
-
-		resp, err := client.Files.Content(ctx, fileId)
-		if err != nil {
-			return fmt.Errorf("failed to read file: %w", err)
-		}
-		defer resp.Body.Close()
-
-		_, err = io.Copy(os.Stdout, resp.Body)
-		if err != nil {
-			return fmt.Errorf("failed to read file: %w", err)
-		}
-
-		return nil
-	},
-}
-
 var assistantFileListCommand = &cobra.Command{
 	Use:   "list",
 	Short: "List assistant files",
@@ -446,8 +371,8 @@ func init() {
 		assistantFileListCommand,
 		assistantFileUploadCommand,
 		assistantFileInfoCommand,
-		assistantFileReadCommand,
 		assistantFileDeleteCommand,
+		// NOTE: Not allowed to download files of purpose: assistants
 	)
 }
 
@@ -473,53 +398,6 @@ var assistantInfoCommand = &cobra.Command{
 
 		return nil
 	},
-}
-
-var assistantUpdateCommand = &cobra.Command{
-	Use:   "update <assistant-id>",
-	Short: "Update an assistant",
-	Args:  cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := cmd.Context()
-
-		// Handle the tools.
-		var tools []openai.AssistantToolUnionParam
-		{
-			if cmd.Flag("code-interpreter").Value.String() == "true" {
-				tools = append(tools, openai.AssistantToolParam{
-					Type: openai.F(openai.AssistantToolTypeCodeInterpreter),
-				})
-			}
-
-			if cmd.Flag("retrieval").Value.String() == "true" {
-				tools = append(tools, openai.FileSearchToolParam{
-					Type: openai.F(openai.FileSearchToolTypeFileSearch),
-					// FileSearch: openai.F(openai.FileSearchToolFileSearchParam{
-					// }),
-				})
-			}
-		}
-
-		_, err := client.Beta.Assistants.Update(ctx, args[0], openai.BetaAssistantUpdateParams{
-			Instructions: openai.F(cmd.Flag("instructions").Value.String()),
-			Name:         openai.F(cmd.Flag("name").Value.String()),
-			Description:  openai.F(cmd.Flag("description").Value.String()),
-			Tools:        openai.F(tools),
-		})
-		if err != nil {
-			return fmt.Errorf("failed to update assistant: %w", err)
-		}
-
-		return nil
-	},
-}
-
-func init() {
-	assistantUpdateCommand.Flags().String("instructions", "", "the instructions for the assistant")
-	assistantUpdateCommand.Flags().String("name", "", "the name of the assistant")
-	assistantUpdateCommand.Flags().String("description", "", "the description of the assistant")
-	assistantUpdateCommand.Flags().BoolP("code-interpreter", "c", true, "enable the code interpreter tool")
-	assistantUpdateCommand.Flags().BoolP("retrieval", "r", true, "enable the retrieval tool")
 }
 
 var assistantDeleteCommand = &cobra.Command{
@@ -639,10 +517,10 @@ answer questions, perform tasks, and even generate code.
 		if len(args) == 1 {
 			assistantID := args[0]
 
-			return startAssistantChat(client, model, assistantID)
+			return startAssistantChat(client, model, assistantID, "")
 		}
 
-		return startAssistantChat(client, model, "")
+		return startAssistantChat(client, model, "", "")
 	},
 }
 
@@ -651,7 +529,7 @@ var assistantCommand = &cobra.Command{
 	Short: "Start an interactive assistant chat session",
 	Long: `Interact with the OpenAI API using the assistant API.
 	
-This can be used to create a temporary assistant, or interact with an existing assistant.
+This can be used to both quickly create a temporary assistant and  manage long-lived assistants. 
 	`,
 	Example: `  $ openai assistant      # create a temporary assistant and start chatting
   $ openai assistant chat # same as above
@@ -662,7 +540,7 @@ This can be used to create a temporary assistant, or interact with an existing a
   $ openai assistant delete <assistant-id>
 	`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return startAssistantChat(client, model, "")
+		return startAssistantChat(client, model, "", "")
 	},
 }
 
@@ -671,7 +549,6 @@ func init() {
 		assistantChatCommand,
 		assistantCreateCommand,
 		assistantInfoCommand,
-		assistantUpdateCommand,
 		assistantDeleteCommand,
 		assistantListCommand,
 		assistantFileCommand,
@@ -684,7 +561,7 @@ func init() {
 
 // startAssistantChat starts an interactive chat session with the OpenAI API, this is a REPL-like
 // command-line program that allows you use the new assistant API (in beta).
-func startAssistantChat(client *openai.Client, model, assistantID string) error {
+func startAssistantChat(client *openai.Client, model, assistantID, threadID string) error {
 	ctx := context.Background()
 
 	var speak bool
@@ -742,12 +619,18 @@ func startAssistantChat(client *openai.Client, model, assistantID string) error 
 		ephemeralAssistant = true
 	}
 
-	thread, err := client.Beta.Threads.New(ctx, openai.BetaThreadNewParams{})
-	if err != nil {
-		return fmt.Errorf("failed to create thread: %w", err)
+	var newThread bool
+	if threadID == "" {
+		thread, err := client.Beta.Threads.New(ctx, openai.BetaThreadNewParams{})
+		if err != nil {
+			return fmt.Errorf("failed to create thread: %w", err)
+		}
+		if ephemeralAssistant {
+			defer client.Beta.Threads.Delete(ctx, thread.ID)
+		}
+		newThread = true
+		threadID = thread.ID
 	}
-
-	defer client.Beta.Threads.Delete(ctx, thread.ID)
 
 	// Set the terminal to raw mode.
 	oldState, err := term.MakeRaw(0)
@@ -832,6 +715,10 @@ func startAssistantChat(client *openai.Client, model, assistantID string) error 
 		bt.Flush()
 	}
 
+	if !ephemeralAssistant && newThread {
+		defer bt.WriteString("Assistant chat thread ID: " + threadID + "\n\n")
+	}
+
 	for {
 		// Move to left edge.
 		bt.WriteString("\033[0G")
@@ -909,7 +796,7 @@ func startAssistantChat(client *openai.Client, model, assistantID string) error 
 			continue
 		case "copy":
 			// Copy last message to clipboard.
-			listResp, err := client.Beta.Threads.Messages.List(ctx, thread.ID, openai.BetaThreadMessageListParams{
+			listResp, err := client.Beta.Threads.Messages.List(ctx, threadID, openai.BetaThreadMessageListParams{
 				Limit: openai.Int(100),
 			})
 			if err != nil {
@@ -1014,15 +901,8 @@ func startAssistantChat(client *openai.Client, model, assistantID string) error 
 				continue
 			}
 
-			// Get the content type of the file.
-			contentType := http.DetectContentType(buf)
-			if err != nil {
-				bt.WriteString(fmt.Sprintf("failed to detect content type: %s\n", err))
-				continue
-			}
-
 			uploadResp, err := client.Files.New(ctx, openai.FileNewParams{
-				File:    openai.FileParam(fh, fields[1], contentType),
+				File:    openai.FileParam(fh, fields[1], http.DetectContentType(buf)),
 				Purpose: openai.F(openai.FilePurposeAssistants),
 			})
 
@@ -1057,7 +937,7 @@ func startAssistantChat(client *openai.Client, model, assistantID string) error 
 			continue
 		}
 
-		_, err = client.Beta.Threads.Messages.New(ctx, thread.ID, openai.BetaThreadMessageNewParams{
+		_, err = client.Beta.Threads.Messages.New(ctx, threadID, openai.BetaThreadMessageNewParams{
 			Role: openai.F(openai.BetaThreadMessageNewParamsRoleUser),
 			Content: openai.F([]openai.MessageContentPartParamUnion{
 				openai.TextContentBlockParam{
@@ -1070,14 +950,14 @@ func startAssistantChat(client *openai.Client, model, assistantID string) error 
 			return fmt.Errorf("failed to create message: %w", err)
 		}
 
-		runResp, err := client.Beta.Threads.Runs.New(ctx, thread.ID, openai.BetaThreadRunNewParams{
+		runResp, err := client.Beta.Threads.Runs.New(ctx, threadID, openai.BetaThreadRunNewParams{
 			AssistantID: openai.F(assistantID),
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create run: %w", err)
 		}
 
-		run, err := client.Beta.Threads.Runs.PollStatus(ctx, thread.ID, runResp.ID, int((700 * time.Millisecond).Milliseconds()))
+		run, err := client.Beta.Threads.Runs.PollStatus(ctx, threadID, runResp.ID, int((700 * time.Millisecond).Milliseconds()))
 		if err != nil {
 			return fmt.Errorf("failed to wait for run: %w", err)
 		}
@@ -1085,7 +965,7 @@ func startAssistantChat(client *openai.Client, model, assistantID string) error 
 			return fmt.Errorf("run failed: %s", run.ID)
 		}
 
-		listResp, err := client.Beta.Threads.Messages.List(ctx, thread.ID, openai.BetaThreadMessageListParams{
+		listResp, err := client.Beta.Threads.Messages.List(ctx, threadID, openai.BetaThreadMessageListParams{
 			Limit: openai.Int(1),
 		})
 		if err != nil {

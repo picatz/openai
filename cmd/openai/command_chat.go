@@ -409,7 +409,7 @@ func summarizeMessages(client *openai.Client, model string, messages []openai.Ch
 	// Create completion request.
 	resp, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 		Model:     openai.F(model),
-		Messages:  openai.F(newMessageUnion(messages)),
+		Messages:  openai.F(newMessageUnion(summaryMsgs)),
 		MaxTokens: openai.F(int64(2048)),
 	})
 	if err != nil {
