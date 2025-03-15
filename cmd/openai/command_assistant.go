@@ -1035,7 +1035,7 @@ func startAssistantChat(client *openai.Client, model, assistantID, threadID stri
 			return fmt.Errorf("failed to wait for run: %w", err)
 		}
 		if run.Status == "failed" {
-			return fmt.Errorf("run failed: %s", run.ID)
+			return fmt.Errorf("run failed: %s: %v: %s", run.ID, run.LastError.Code, run.LastError.Message)
 		}
 
 		listResp, err := client.Beta.Threads.Messages.List(ctx, threadID, openai.BetaThreadMessageListParams{
