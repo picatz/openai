@@ -1,7 +1,6 @@
 module github.com/picatz/openai
 
 go 1.21
-
 toolchain go1.23.4
 
 require (
@@ -11,7 +10,7 @@ require (
 	github.com/hajimehoshi/go-mp3 v0.3.4
 	github.com/openai/openai-go v0.1.0-alpha.45
 	github.com/spf13/cobra v1.8.0
-	golang.org/x/term v0.27.0
+	golang.org/x/term v0.29.0
 )
 
 require (
@@ -40,6 +39,6 @@ require (
 	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/yuin/goldmark v1.5.6 // indirect
 	github.com/yuin/goldmark-emoji v1.0.2 // indirect
-	golang.org/x/net v0.33.0 // indirect
-	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/net v0.36.0 // indirect
+	golang.org/x/sys v0.30.0 // indirect
 )
