@@ -1,7 +1,6 @@
 module github.com/picatz/openai
 
-go 1.21
-toolchain go1.23.4
+go 1.24.0
 
 require (
 	github.com/charmbracelet/glamour v0.6.0
