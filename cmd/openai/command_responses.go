@@ -115,6 +115,8 @@ func startResonsesChat(ctx context.Context, client *responses.Client, model stri
 	// Print welcome message.
 	bt.WriteString(styleBold.Render("Welcome to the OpenAI API Responses CLI chat mode!"))
 	bt.WriteString("\n\n")
+	bt.WriteString(styleWarning.Render("WARNING") + styleFaint.Render(": All responses are stored and deleted after exiting.\n\n"))
+	bt.WriteString("\033[0G")
 	bt.WriteString(styleBold.Render("Commands") + " " + styleFaint.Render("(tab complete)") + "\n\n")
 	bt.WriteString("- " + styleFaint.Render("clear") + " to clear screen.\n")
 	bt.WriteString("- " + styleFaint.Render("delete") + " to delete previous response (up to given number).\n")
