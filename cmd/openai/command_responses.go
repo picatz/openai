@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -121,6 +122,35 @@ func startResonsesChat(ctx context.Context, client *responses.Client, model stri
 	bt.WriteString("- " + styleFaint.Render("exit") + " to quit.\n\n")
 	bt.Flush()
 
+	var allRespIDs []string
+	defer func() {
+		total := len(allRespIDs)
+		if total == 0 {
+			return
+		}
+		bt.WriteString("\n")
+		bt.Flush()
+
+		for i, respID := range allRespIDs {
+			if err := client.Delete(ctx, respID); err != nil {
+				bt.WriteString(respID + ":" + err.Error() + "\n")
+				bt.Flush()
+				return
+			}
+			progress := i + 1
+			percent := float64(progress) / float64(total)
+			barWidth := 20
+			completedBars := int(percent * float64(barWidth))
+			remainingBars := barWidth - completedBars
+			progressBar := strings.Repeat("█", completedBars) + strings.Repeat("_", remainingBars)
+			bt.WriteString(styleFaint.Render("\033[0G" + fmt.Sprintf("Deleting responses %s (%d/%d)", progressBar, progress, total)))
+			bt.Flush()
+		}
+		bt.WriteString("\n")
+		bt.WriteString("\n")
+		bt.Flush()
+	}()
+
 	var prevRespID string
 
 	for {
@@ -153,7 +183,7 @@ func startResonsesChat(ctx context.Context, client *responses.Client, model stri
 			continue
 		}
 
-		resp, err := client.CreateResponse(ctx, responses.Request{
+		resp, err := client.Create(ctx, responses.Request{
 			Model:              model,
 			PreviousResponseID: prevRespID,
 			Input:              responses.Text(input),
@@ -187,6 +217,7 @@ func startResonsesChat(ctx context.Context, client *responses.Client, model stri
 			bt.WriteString(s)
 		}
 
+		allRespIDs = append(allRespIDs, resp.ID)
 		prevRespID = resp.ID
 	}
 }
