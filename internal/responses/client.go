@@ -223,13 +223,13 @@ type RequestToolFunction struct {
 func (RequestToolFunction) isRequestTool() {}
 
 func (tf RequestToolFunction) MarshalJSON() ([]byte, error) {
-	type Alias RequestToolFunction
-	return json.Marshal(&struct {
+	type alias RequestToolFunction
+	return json.Marshal(struct {
 		Type string `json:"type"`
-		*Alias
+		alias
 	}{
 		Type:  "function",
-		Alias: (*Alias)(&tf),
+		alias: (alias)(tf),
 	})
 }
 
@@ -238,13 +238,13 @@ type RequestToolWebSearchPreview struct{}
 func (RequestToolWebSearchPreview) isRequestTool() {}
 
 func (RequestToolWebSearchPreview) MarshalJSON() ([]byte, error) {
-	type Alias RequestToolWebSearchPreview
-	return json.Marshal(&struct {
+	type alias RequestToolWebSearchPreview
+	return json.Marshal(struct {
 		Type string `json:"type"`
-		*Alias
+		alias
 	}{
 		Type:  "web_search_preview",
-		Alias: (*Alias)(&RequestToolWebSearchPreview{}),
+		alias: (alias)(RequestToolWebSearchPreview{}),
 	})
 }
 
@@ -307,13 +307,13 @@ type Message struct {
 func (Message) isInputItem() {}
 
 func (ii Message) MarshalJSON() ([]byte, error) {
-	type Alias Message
-	return json.Marshal(&struct {
+	type alias Message
+	return json.Marshal(struct {
 		Type string `json:"type"`
-		*Alias
+		alias
 	}{
 		Type:  "message",
-		Alias: (*Alias)(&ii),
+		alias: (alias)(ii),
 	})
 }
 
@@ -327,13 +327,13 @@ type OutputMessage struct {
 func (OutputMessage) isInputItem() {}
 
 func (ii OutputMessage) MarshalJSON() ([]byte, error) {
-	type Alias OutputMessage
-	return json.Marshal(&struct {
+	type alias OutputMessage
+	return json.Marshal(struct {
 		Type string `json:"type"`
-		*Alias
+		alias
 	}{
 		Type:  "message",
-		Alias: (*Alias)(&ii),
+		alias: (alias)(ii),
 	})
 }
 
@@ -349,13 +349,13 @@ type OutputText struct {
 func (OutputText) isOutputMessage() {}
 
 func (outputText OutputText) MarshalJSON() ([]byte, error) {
-	type Alias OutputText
-	return json.Marshal(&struct {
+	type alias OutputText
+	return json.Marshal(struct {
 		Type string `json:"type"`
-		*Alias
+		alias
 	}{
 		Type:  "output_text",
-		Alias: (*Alias)(&outputText),
+		alias: (alias)(outputText),
 	})
 }
 
@@ -366,13 +366,13 @@ type OutputRefusal struct {
 func (OutputRefusal) isOutputMessage() {}
 
 func (outputRefusal OutputRefusal) MarshalJSON() ([]byte, error) {
-	type Alias OutputRefusal
-	return json.Marshal(&struct {
+	type alias OutputRefusal
+	return json.Marshal(struct {
 		Type string `json:"type"`
-		*Alias
+		alias
 	}{
 		Type:  "refusal",
-		Alias: (*Alias)(&outputRefusal),
+		alias: (alias)(outputRefusal),
 	})
 }
 
@@ -388,7 +388,7 @@ func (InputText) isMessageContent() {}
 
 func (ii InputText) MarshalJSON() ([]byte, error) {
 	type Alias InputText
-	return json.Marshal(&struct {
+	return json.Marshal(struct {
 		Type string `json:"type"`
 		*Alias
 	}{
@@ -406,13 +406,13 @@ type InputImage struct {
 func (InputImage) isMessageContent() {}
 
 func (ii InputImage) MarshalJSON() ([]byte, error) {
-	type Alias InputImage
-	return json.Marshal(&struct {
+	type alias InputImage
+	return json.Marshal(struct {
 		Type string `json:"type"`
-		*Alias
+		alias
 	}{
 		Type:  "input_image",
-		Alias: (*Alias)(&ii),
+		alias: (alias)(ii),
 	})
 }
 
@@ -425,13 +425,13 @@ type InputFile struct {
 func (InputFile) isMessageContent() {}
 
 func (ii InputFile) MarshalJSON() ([]byte, error) {
-	type Alias InputFile
-	return json.Marshal(&struct {
+	type alias InputFile
+	return json.Marshal(struct {
 		Type string `json:"type"`
-		*Alias
+		alias
 	}{
 		Type:  "input_file",
-		Alias: (*Alias)(&ii),
+		alias: (alias)(ii),
 	})
 }
 
