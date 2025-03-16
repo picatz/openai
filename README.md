@@ -30,6 +30,7 @@ Available Commands:
   completion  Generate the autocompletion script for the specified shell
   help        Help about any command
   image       Generate an image with DALL·E
+  responses   Manage the OpenAI Responses API
 
 Flags:
   -h, --help   help for openai
