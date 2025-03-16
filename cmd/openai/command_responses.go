@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/picatz/openai/internal/responses"
@@ -87,14 +88,11 @@ func startResonsesChat(ctx context.Context, client *responses.Client, model stri
 
 	cls()
 
-	// Print a welcome message to explain how to use the chat mode.
-	// t.Write([]byte("Welcome to the OpenAI API CLI chat mode. Type '\033[2mdelete\033[0m' to forget last message. Type '\033[2mexit\033[0m' to quit.\n\n"))
-
 	// Autocomplete for commands.
 	t.AutoCompleteCallback = func(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
 		// If the user presses tab, then autocomplete the command.
 		if key == '\t' {
-			for _, cmd := range []string{"exit", "clear", "delete", "copy", "erase", "system:", "<clipboard>"} {
+			for _, cmd := range []string{"exit", "clear", "delete"} {
 				if strings.HasPrefix(cmd, line) {
 					// Autocomplete the command.
 					// t.Write([]byte(cmd[len(line):]))
@@ -119,6 +117,7 @@ func startResonsesChat(ctx context.Context, client *responses.Client, model stri
 	bt.WriteString("\n\n")
 	bt.WriteString(styleBold.Render("Commands") + " " + styleFaint.Render("(tab complete)") + "\n\n")
 	bt.WriteString("- " + styleFaint.Render("clear") + " to clear screen.\n")
+	bt.WriteString("- " + styleFaint.Render("delete") + " to delete previous response (up to given number).\n")
 	bt.WriteString("- " + styleFaint.Render("exit") + " to quit.\n\n")
 	bt.Flush()
 
@@ -137,12 +136,14 @@ func startResonsesChat(ctx context.Context, client *responses.Client, model stri
 				bt.Flush()
 				return
 			}
-			progress := i + 1
-			percent := float64(progress) / float64(total)
-			barWidth := 20
-			completedBars := int(percent * float64(barWidth))
-			remainingBars := barWidth - completedBars
-			progressBar := strings.Repeat("█", completedBars) + strings.Repeat("_", remainingBars)
+			var (
+				progress      = i + 1
+				percent       = float64(progress) / float64(total)
+				barWidth      = 20
+				completedBars = int(percent * float64(barWidth))
+				remainingBars = barWidth - completedBars
+				progressBar   = strings.Repeat("█", completedBars) + strings.Repeat("_", remainingBars)
+			)
 			bt.WriteString(styleFaint.Render("\033[0G" + fmt.Sprintf("Deleting responses %s (%d/%d)", progressBar, progress, total)))
 			bt.Flush()
 		}
@@ -181,6 +182,45 @@ func startResonsesChat(ctx context.Context, client *responses.Client, model stri
 			// Clear the screen.
 			cls()
 			continue
+		}
+
+		fields := strings.Fields(input)
+
+		switch fields[0] {
+		case "delete":
+			if len(fields) == 1 {
+				bt.WriteString("Usage: delete <number>\n")
+				bt.Flush()
+				continue
+			}
+			if len(fields) == 2 {
+				num, err := strconv.Atoi(fields[1])
+				if err != nil {
+					bt.WriteString("Usage: delete <number>\n")
+					bt.Flush()
+					continue
+				}
+				var deletedN int
+				for i := 0; i < num && len(allRespIDs) > 0; i++ {
+					respID := allRespIDs[len(allRespIDs)-1]     // Get the last response ID.
+					allRespIDs = allRespIDs[:len(allRespIDs)-1] // Remove it from the list.
+
+					if err := client.Delete(ctx, respID); err != nil {
+						bt.WriteString(respID + ":" + err.Error() + "\n")
+						bt.Flush()
+						return
+					}
+
+					if prevRespID == respID {
+						prevRespID = ""
+					}
+
+					deletedN++
+				}
+				bt.WriteString(fmt.Sprintf("Deleted %d responses.\n", deletedN))
+				bt.Flush()
+				continue
+			}
 		}
 
 		resp, err := client.Create(ctx, responses.Request{
