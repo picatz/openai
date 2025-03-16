@@ -352,13 +352,12 @@ func (ii Message) MarshalJSON() ([]byte, error) {
 }
 
 func (m *Message) UnmarshalJSON(b []byte) error {
-	// Define an alias to avoid recursion
-	type Alias Message
+	type alias Message
 	aux := &struct {
 		Content json.RawMessage `json:"content"`
-		*Alias
+		*alias
 	}{
-		Alias: (*Alias)(m),
+		alias: (*alias)(m),
 	}
 
 	// Unmarshal into the auxiliary structure
@@ -472,14 +471,14 @@ type OutputRefusal struct {
 
 func (OutputRefusal) isOutputMessage() {}
 
-func (outputRefusal OutputRefusal) MarshalJSON() ([]byte, error) {
+func (of OutputRefusal) MarshalJSON() ([]byte, error) {
 	type alias OutputRefusal
 	return json.Marshal(struct {
 		Type string `json:"type"`
 		alias
 	}{
 		Type:  "refusal",
-		alias: (alias)(outputRefusal),
+		alias: (alias)(of),
 	})
 }
 
@@ -490,21 +489,21 @@ type InputText struct {
 func (InputText) isMessageContent() {}
 func (InputText) isInputItem()      {}
 
-func (ii InputText) MarshalJSON() ([]byte, error) {
+func (it InputText) MarshalJSON() ([]byte, error) {
 	type Alias InputText
 	return json.Marshal(struct {
 		Type string `json:"type"`
 		*Alias
 	}{
 		Type:  "input_text",
-		Alias: (*Alias)(&ii),
+		Alias: (*Alias)(&it),
 	})
 }
 
 type InputImage struct {
-	Detail   string  `json:"detail"`
-	FileID   *string `json:"file_id,omitempty"`
-	ImageURL *string `json:"image_url,omitempty"`
+	Detail   string `json:"detail"`
+	FileID   string `json:"file_id,omitzero"`
+	ImageURL string `json:"image_url,omitzero"`
 }
 
 // func (InputImage) isMessageContent() {}
@@ -522,9 +521,9 @@ func (ii InputImage) MarshalJSON() ([]byte, error) {
 }
 
 type InputFile struct {
-	FileID   *string `json:"file_id,omitempty"`
-	FileData *string `json:"file_data,omitempty"`
-	Filename *string `json:"filename,omitempty"`
+	FileID   string `json:"file_id,omitzero"`
+	FileData string `json:"file_data,omitzero"`
+	Filename string `json:"filename,omitzero"`
 }
 
 // func (InputFile) isMessageContent() {}
@@ -634,9 +633,7 @@ func unmarshalJSON(r io.Reader, result any) error {
 	return nil
 }
 
-// Create sends a POST request to the /responses endpoint with the given request data.
-// On success, it returns a Response struct populated with the API result.
-// For more information, see: https://platform.openai.com/docs/api-reference/responses
+// https://platform.openai.com/docs/api-reference/responses/create
 func (c *Client) Create(ctx context.Context, reqData Request) (*Response, error) {
 	url := fmt.Sprintf("%s/responses", c.BaseURL)
 
@@ -733,6 +730,13 @@ type GetInputItemsOptions struct {
 	Order  string
 }
 
+type ResponseInputItems struct {
+	FirstID string   `json:"first_id"`
+	LastID  string   `json:"last_id"`
+	HasMore bool     `json:"has_more"`
+	Data    ItemList `json:"data"`
+}
+
 // https://platform.openai.com/docs/api-reference/responses/input-items
 func (c *Client) GetInputItems(ctx context.Context, responseID string, opts *GetInputItemsOptions) (*ResponseInputItems, error) {
 	url := fmt.Sprintf("%s/responses/%s/input_items", c.BaseURL, responseID)
@@ -779,11 +783,4 @@ func (c *Client) GetInputItems(ctx context.Context, responseID string, opts *Get
 	}
 
 	return &apiResp, nil
-}
-
-type ResponseInputItems struct {
-	FirstID string   `json:"first_id"`
-	LastID  string   `json:"last_id"`
-	HasMore bool     `json:"has_more"`
-	Data    ItemList `json:"data"`
 }
