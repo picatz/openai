@@ -272,11 +272,45 @@ type RequestInput interface {
 	isRequestInput()
 }
 
-type InputItemList []InputItem
+// https://platform.openai.com/docs/api-reference/responses/list
+type ItemList []Item
 
-func (InputItemList) isRequestInput() {}
+func (ItemList) isRequestInput()   {}
+func (ItemList) isMessageContent() {}
 
-type InputItem interface {
+func (il *ItemList) UnmarshalJSON(b []byte) error {
+	var items []map[string]any
+
+	if err := json.Unmarshal(b, &items); err != nil {
+		return err
+	}
+
+	for _, item := range items {
+		itemType, ok := item["type"].(string)
+		if !ok {
+			return fmt.Errorf("missing type field in item: %v", item)
+		}
+		switch itemType {
+		case "message":
+			b, err := json.Marshal(item)
+			if err != nil {
+				return fmt.Errorf("failed to marshal item data: %w", err)
+			}
+
+			var msg Message
+			if err := json.Unmarshal(b, &msg); err != nil {
+				return err
+			}
+			*il = append(*il, msg)
+		default:
+			return fmt.Errorf("unknown item type: %s", itemType)
+		}
+	}
+
+	return nil
+}
+
+type Item interface {
 	isInputItem()
 }
 
@@ -315,6 +349,79 @@ func (ii Message) MarshalJSON() ([]byte, error) {
 		Type:  "message",
 		alias: (alias)(ii),
 	})
+}
+
+func (m *Message) UnmarshalJSON(b []byte) error {
+	// Define an alias to avoid recursion
+	type Alias Message
+	aux := &struct {
+		Content json.RawMessage `json:"content"`
+		*Alias
+	}{
+		Alias: (*Alias)(m),
+	}
+
+	// Unmarshal into the auxiliary structure
+	if err := json.Unmarshal(b, aux); err != nil {
+		return err
+	}
+
+	// If no content is provided, nothing to do
+	if len(aux.Content) == 0 {
+		return nil
+	}
+
+	switch aux.Content[0] {
+	case '"':
+		var text Text
+		if err := json.Unmarshal(aux.Content, &text); err != nil {
+			return err
+		}
+		m.Content = text
+		return nil
+	case '[':
+		var rawArr []json.RawMessage
+		if err := json.Unmarshal(aux.Content, &rawArr); err != nil {
+			return err
+		}
+		var contents ItemList
+		for _, raw := range rawArr {
+			var typeHolder struct {
+				Type string `json:"type"`
+			}
+			if err := json.Unmarshal(raw, &typeHolder); err != nil {
+				return err
+			}
+			switch typeHolder.Type {
+			case "input_text":
+				var inputText InputText
+				if err := json.Unmarshal(raw, &inputText); err != nil {
+					return err
+				}
+				contents = append(contents, inputText)
+			case "input_image":
+				var inputImage InputImage
+				if err := json.Unmarshal(raw, &inputImage); err != nil {
+					return err
+				}
+				contents = append(contents, inputImage)
+			case "input_file":
+				var inputFile InputFile
+				if err := json.Unmarshal(raw, &inputFile); err != nil {
+					return err
+				}
+				contents = append(contents, inputFile)
+			default:
+				return fmt.Errorf("unknown message content type: %s", typeHolder.Type)
+			}
+
+			m.Content = contents
+		}
+	default:
+		return fmt.Errorf("unknown message content type: %q: %q", aux.Content[0], aux.Content)
+	}
+
+	return nil
 }
 
 type OutputMessage struct {
@@ -376,15 +483,12 @@ func (outputRefusal OutputRefusal) MarshalJSON() ([]byte, error) {
 	})
 }
 
-type InputList []InputItem
-
-func (InputList) isMessageContent() {}
-
 type InputText struct {
 	Text string `json:"text"`
 }
 
 func (InputText) isMessageContent() {}
+func (InputText) isInputItem()      {}
 
 func (ii InputText) MarshalJSON() ([]byte, error) {
 	type Alias InputText
@@ -403,7 +507,8 @@ type InputImage struct {
 	ImageURL *string `json:"image_url,omitempty"`
 }
 
-func (InputImage) isMessageContent() {}
+// func (InputImage) isMessageContent() {}
+func (InputImage) isInputItem() {}
 
 func (ii InputImage) MarshalJSON() ([]byte, error) {
 	type alias InputImage
@@ -422,7 +527,8 @@ type InputFile struct {
 	Filename *string `json:"filename,omitempty"`
 }
 
-func (InputFile) isMessageContent() {}
+// func (InputFile) isMessageContent() {}
+func (InputFile) isInputItem() {}
 
 func (ii InputFile) MarshalJSON() ([]byte, error) {
 	type alias InputFile
@@ -494,10 +600,44 @@ type Response struct {
 	} `json:"metadata"`
 }
 
-// CreateResponse sends a POST request to the /responses endpoint with the given request data.
+func handleErrorResponse(resp *http.Response) error {
+	if resp.StatusCode != http.StatusOK {
+		var errResp struct {
+			Error struct {
+				Message string `json:"message"`
+				Type    string `json:"type"`
+				Code    string `json:"code"`
+			} `json:"error"`
+		}
+
+		err := unmarshalJSON(resp.Body, &errResp)
+		if err != nil {
+			return fmt.Errorf("failed to unmarshal error response: %w", err)
+		}
+
+		return fmt.Errorf("API error: %s: %s: %s", errResp.Error.Code, errResp.Error.Type, errResp.Error.Message)
+	}
+	return nil
+}
+
+// unmarshalJSON reads the response body and unmarshals it into the provided result struct.
+func unmarshalJSON(r io.Reader, result any) error {
+	b, err := io.ReadAll(r)
+	if err != nil {
+		return fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	err = json.Unmarshal(b, result)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Create sends a POST request to the /responses endpoint with the given request data.
 // On success, it returns a Response struct populated with the API result.
 // For more information, see: https://platform.openai.com/docs/api-reference/responses
-func (c *Client) CreateResponse(ctx context.Context, reqData Request) (*Response, error) {
+func (c *Client) Create(ctx context.Context, reqData Request) (*Response, error) {
 	url := fmt.Sprintf("%s/responses", c.BaseURL)
 
 	body, err := json.Marshal(reqData)
@@ -520,20 +660,7 @@ func (c *Client) CreateResponse(ctx context.Context, reqData Request) (*Response
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		var errResp struct {
-			Error struct {
-				Message string `json:"message"`
-				Type    string `json:"type"`
-				Code    string `json:"code"`
-			} `json:"error"`
-		}
-
-		err := unmarshalJSON(resp.Body, &errResp)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal error response: %w", err)
-		}
-
-		return nil, fmt.Errorf("API error: %s: %s: %s", errResp.Error.Code, errResp.Error.Type, errResp.Error.Message)
+		return nil, handleErrorResponse(resp)
 	}
 
 	var apiResp Response
@@ -545,16 +672,118 @@ func (c *Client) CreateResponse(ctx context.Context, reqData Request) (*Response
 	return &apiResp, nil
 }
 
-// unmarshalJSON reads the response body and unmarshals it into the provided result struct.
-func unmarshalJSON(r io.Reader, result any) error {
-	b, err := io.ReadAll(r)
+// https://platform.openai.com/docs/api-reference/responses/get
+func (c *Client) Get(ctx context.Context, responseID string) (*Response, error) {
+	url := fmt.Sprintf("%s/responses/%s", c.BaseURL, responseID)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return fmt.Errorf("failed to read response body: %w", err)
+		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
 	}
 
-	err = json.Unmarshal(b, result)
+	req.Header.Set("Authorization", "Bearer "+c.APIKey)
+
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("HTTP request error: %w", err)
 	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, handleErrorResponse(resp)
+	}
+
+	var apiResp Response
+	err = unmarshalJSON(resp.Body, &apiResp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal API response: %w", err)
+	}
+
+	return &apiResp, nil
+}
+
+// https://platform.openai.com/docs/api-reference/responses/delete
+func (c *Client) Delete(ctx context.Context, responseID string) error {
+	url := fmt.Sprintf("%s/responses/%s", c.BaseURL, responseID)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create HTTP request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.APIKey)
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("HTTP request error: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent {
+		return handleErrorResponse(resp)
+	}
+
 	return nil
+}
+
+type GetInputItemsOptions struct {
+	After  string
+	Before string
+	Limit  int
+	Order  string
+}
+
+// https://platform.openai.com/docs/api-reference/responses/input-items
+func (c *Client) GetInputItems(ctx context.Context, responseID string, opts *GetInputItemsOptions) (*ResponseInputItems, error) {
+	url := fmt.Sprintf("%s/responses/%s/input_items", c.BaseURL, responseID)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.APIKey)
+
+	// Set query parameters
+	if opts != nil {
+		query := req.URL.Query()
+		if opts.After != "" {
+			query.Add("after", opts.After)
+		}
+		if opts.Before != "" {
+			query.Add("before", opts.Before)
+		}
+		if opts.Limit > 0 {
+			query.Add("limit", fmt.Sprintf("%d", opts.Limit))
+		}
+		if opts.Order != "" {
+			query.Add("order", opts.Order)
+		}
+		req.URL.RawQuery = query.Encode()
+	}
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("HTTP request error: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, handleErrorResponse(resp)
+	}
+
+	var apiResp ResponseInputItems
+	err = unmarshalJSON(resp.Body, &apiResp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal API response: %w", err)
+	}
+
+	return &apiResp, nil
+}
+
+type ResponseInputItems struct {
+	FirstID string   `json:"first_id"`
+	LastID  string   `json:"last_id"`
+	HasMore bool     `json:"has_more"`
+	Data    ItemList `json:"data"`
 }

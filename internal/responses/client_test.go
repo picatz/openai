@@ -1,6 +1,7 @@
 package responses_test
 
 import (
+	"context"
 	"net/http"
 	"os"
 	"slices"
@@ -104,9 +105,10 @@ func TestSimpleInputText(t *testing.T) {
 	request := responses.Request{
 		Model: "gpt-4o",
 		Input: responses.Text("Hey there!"),
+		Store: false,
 	}
 
-	resp, err := client.CreateResponse(ctx, request)
+	resp, err := client.Create(ctx, request)
 	must.NoError(t, err)
 	must.StrHasPrefix(t, "gpt-4o", resp.Model) // it won't be the exact model name you requested
 	must.Eq(t, 1, len(resp.Output))
@@ -128,9 +130,10 @@ func TestSimpleReasoningInputText(t *testing.T) {
 		Reasoning: &responses.RequestResoning{
 			Effort: "high",
 		},
+		Store: false,
 	}
 
-	resp, err := client.CreateResponse(ctx, request)
+	resp, err := client.Create(ctx, request)
 	must.NoError(t, err)
 	must.StrHasPrefix(t, "o3-mini", resp.Model) // it won't be the exact model name you requested
 
@@ -171,9 +174,10 @@ func TestSimpleFunctionCallInputText(t *testing.T) {
 				},
 			},
 		},
+		Store: false,
 	}
 
-	resp, err := client.CreateResponse(ctx, request)
+	resp, err := client.Create(ctx, request)
 	must.NoError(t, err)
 
 	for _, output := range resp.Output {
@@ -195,9 +199,10 @@ func TestSimpleWebSearchPreview(t *testing.T) {
 		Tools: responses.RequestTools{
 			responses.RequestToolWebSearchPreview{},
 		},
+		Store: false,
 	}
 
-	resp, err := client.CreateResponse(ctx, request)
+	resp, err := client.Create(ctx, request)
 	must.NoError(t, err)
 
 	for _, output := range resp.Output {
@@ -211,16 +216,17 @@ func TestSimpleChatFlow_manual_history(t *testing.T) {
 
 	client := testClient(t)
 
-	history := responses.InputItemList{}
+	history := responses.ItemList{}
 
 	history = append(history, responses.Message{
 		Role:    responses.RoleUser,
 		Content: responses.Text("Hello!"),
 	})
 
-	resp, err := client.CreateResponse(ctx, responses.Request{
+	resp, err := client.Create(ctx, responses.Request{
 		Model: "gpt-4o",
 		Input: history,
+		Store: false,
 	})
 	must.NoError(t, err)
 	must.StrHasPrefix(t, "gpt-4o", resp.Model) // it won't be the exact model name you requested
@@ -238,9 +244,10 @@ func TestSimpleChatFlow_manual_history(t *testing.T) {
 		Content: responses.Text("what is a good name for a cat?"),
 	})
 
-	resp, err = client.CreateResponse(ctx, responses.Request{
+	resp, err = client.Create(ctx, responses.Request{
 		Model: "gpt-4o",
 		Input: history,
+		Store: false,
 	})
 	must.NoError(t, err)
 
@@ -258,16 +265,17 @@ func TestSimpleChatFlow_manual_history(t *testing.T) {
 		Content: responses.Text("pick one of the names you suggested, provide ONLY the name and nothing else in the response"),
 	})
 
-	resp, err = client.CreateResponse(ctx, responses.Request{
+	resp, err = client.Create(ctx, responses.Request{
 		Model: "gpt-4o",
 		Input: history,
+		Store: false,
 	})
 	must.NoError(t, err)
 
 	for _, output := range resp.Output {
 		must.Eq(t, "message", output.Type)
 
-		must.True(t, slices.ContainsFunc(history, func(item responses.InputItem) bool {
+		must.True(t, slices.ContainsFunc(history, func(item responses.Item) bool {
 			itemMessage, ok := item.(responses.Message)
 			must.True(t, ok)
 
@@ -300,11 +308,15 @@ func TestSimpleChatFlow_automatic_history(t *testing.T) {
 
 	client := testClient(t)
 
-	firstResp, err := client.CreateResponse(ctx, responses.Request{
+	firstResp, err := client.Create(ctx, responses.Request{
 		Model: "gpt-4o",
 		Input: responses.Text("what is a good name for a cat?"),
 	})
 	must.NoError(t, err)
+	t.Cleanup(func() {
+		err := client.Delete(context.Background(), firstResp.ID)
+		must.NoError(t, err)
+	})
 
 	var potentialCatNames string
 
@@ -313,15 +325,67 @@ func TestSimpleChatFlow_automatic_history(t *testing.T) {
 		potentialCatNames += output.Content[0].Text
 	}
 
-	secondResp, err := client.CreateResponse(ctx, responses.Request{
+	secondResp, err := client.Create(ctx, responses.Request{
 		Model:              "gpt-4o",
 		Input:              responses.Text("pick one of the names you suggested, provide ONLY the name and nothing else in the response"),
 		PreviousResponseID: firstResp.ID,
 	})
 	must.NoError(t, err)
+	t.Cleanup(func() {
+		err := client.Delete(context.Background(), secondResp.ID)
+		must.NoError(t, err)
+	})
 
 	for _, output := range secondResp.Output {
 		must.Eq(t, "message", output.Type)
 		must.True(t, strings.Contains(potentialCatNames, output.Content[0].Text))
 	}
+}
+
+func TestCreateThenGetInputItems(t *testing.T) {
+	ctx := t.Context()
+
+	client := testClient(t)
+
+	resp, err := client.Create(ctx, responses.Request{
+		Model: "gpt-4o",
+		Input: responses.Text("hello?"),
+	})
+	must.NoError(t, err)
+	t.Cleanup(func() {
+		err := client.Delete(context.Background(), resp.ID)
+		must.NoError(t, err)
+	})
+
+	itemsResp, err := client.GetInputItems(ctx, resp.ID, nil)
+	must.NoError(t, err)
+	must.Eq(t, 1, len(itemsResp.Data))
+
+	inputData, ok := itemsResp.Data[0].(responses.Message)
+	must.True(t, ok)
+	must.Eq(t, "completed", inputData.Status)
+
+	inputDataContentInputItemList, ok := inputData.Content.(responses.ItemList)
+	must.True(t, ok)
+	must.Eq(t, 1, len(inputDataContentInputItemList))
+
+	input, ok := inputDataContentInputItemList[0].(responses.InputText)
+	must.True(t, ok)
+	must.Eq(t, "hello?", input.Text)
+}
+
+func TestDelete(t *testing.T) {
+	ctx := t.Context()
+
+	client := testClient(t)
+
+	resp, err := client.Create(ctx, responses.Request{
+		Model: "gpt-4o",
+		Input: responses.Text("hello?"),
+		Store: true, // default is true, but just to be explicit
+	})
+	must.NoError(t, err)
+
+	err = client.Delete(ctx, resp.ID)
+	must.NoError(t, err)
 }
