@@ -18,6 +18,8 @@ import (
 func init() {
 	responsesCommand.AddCommand(
 		responsesChatCommand,
+		responsesGetCommand,
+		responsesDeleteCommand,
 	)
 
 	rootCmd.AddCommand(
@@ -29,7 +31,9 @@ var responsesCommand = &cobra.Command{
 	Use:   "responses",
 	Short: "Manage the OpenAI Responses API",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		startChat(client, model)
+		client := responses.NewClient(os.Getenv("OPENAI_API_KEY"), http.DefaultClient)
+
+		startResonsesChat(cmd.Context(), client, "gpt-4o")
 
 		return nil
 	},
@@ -43,6 +47,53 @@ var responsesChatCommand = &cobra.Command{
 
 		startResonsesChat(cmd.Context(), client, "gpt-4o")
 
+		return nil
+	},
+}
+
+var responsesGetCommand = &cobra.Command{
+	Use:   "get",
+	Short: "Get a single response",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client := responses.NewClient(os.Getenv("OPENAI_API_KEY"), http.DefaultClient)
+
+		resp, err := client.Create(cmd.Context(), responses.Request{
+			Model:      "gpt-4o",
+			Input:      responses.Text(strings.Join(args, " ")),
+			ToolChoice: responses.RequestToolChoiceAuto,
+			Tools: responses.RequestTools{
+				responses.RequestToolWebSearchPreview{},
+			},
+			Store: false,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create response: %w", err)
+		}
+
+		for _, output := range resp.Output {
+			if output.Type != "message" {
+				continue
+			}
+			cmd.OutOrStdout().Write([]byte(output.Content[0].Text + "\n"))
+		}
+
+		return nil
+	},
+}
+
+var responsesDeleteCommand = &cobra.Command{
+	Use:   "delete",
+	Short: "Delete a single response",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client := responses.NewClient(os.Getenv("OPENAI_API_KEY"), http.DefaultClient)
+
+		respID := args[0]
+		if err := client.Delete(cmd.Context(), respID); err != nil {
+			return fmt.Errorf("failed to delete response %q: %w", respID, err)
+		}
+
+		cmd.OutOrStdout().Write([]byte(fmt.Sprintf("Deleted response %q\n", respID)))
 		return nil
 	},
 }
