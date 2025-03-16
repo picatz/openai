@@ -501,7 +501,7 @@ func (it InputText) MarshalJSON() ([]byte, error) {
 }
 
 type InputImage struct {
-	Detail   string `json:"detail"`
+	Detail   string `json:"detail,omitzero"`
 	FileID   string `json:"file_id,omitzero"`
 	ImageURL string `json:"image_url,omitzero"`
 }
@@ -522,7 +522,7 @@ func (ii InputImage) MarshalJSON() ([]byte, error) {
 
 type InputFile struct {
 	FileID   string `json:"file_id,omitzero"`
-	FileData string `json:"file_data,omitzero"`
+	FileData []byte `json:"file_data,omitzero"`
 	Filename string `json:"filename,omitzero"`
 }
 
