@@ -389,3 +389,32 @@ func TestDelete(t *testing.T) {
 	err = client.Delete(ctx, resp.ID)
 	must.NoError(t, err)
 }
+
+func TestCreateWithImageInput(t *testing.T) {
+	ctx := t.Context()
+
+	client := testClient(t)
+
+	resp, err := client.Create(ctx, responses.Request{
+		Model: "gpt-4o",
+		Input: responses.ItemList{
+			responses.Message{
+				Role: responses.RoleUser,
+				Content: responses.ItemList{
+					responses.InputText{
+						Text: "What animal is this? Respond with only the name of the animal, nothing else.",
+					},
+					responses.InputImage{
+						ImageURL: "https://upload.wikimedia.org/wikipedia/commons/3/3a/Cat03.jpg",
+					},
+				},
+			},
+		},
+		Store: false,
+	})
+	must.NoError(t, err)
+	must.Eq(t, 1, len(resp.Output))
+	must.Eq(t, 1, len(resp.Output[0].Content))
+	must.Eq(t, "message", resp.Output[0].Type)
+	must.Eq(t, "cat", strings.ToLower(resp.Output[0].Content[0].Text))
+}
