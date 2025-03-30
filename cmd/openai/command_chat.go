@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -30,9 +31,16 @@ func init() {
 	rootCmd.AddCommand(
 		chatCommand,
 	)
+	if runtime.GOOS == "windows" {
+		userHome = os.Getenv("USERPROFILE")
+	} else {
+		userHome = os.Getenv("HOME")
+	}
+	cacheFilePath = userHome + "/.openai-cli-chat-cache"
 }
 
-var cacheFilePath = os.Getenv("HOME") + "/.openai-cli-chat-cache"
+var userHome string
+var cacheFilePath string
 
 func newMessageUnion(messages []openai.ChatCompletionMessage) []openai.ChatCompletionMessageParamUnion {
 	msgUnion := make([]openai.ChatCompletionMessageParamUnion, len(messages))
@@ -75,13 +83,14 @@ func startChat(client *openai.Client, model string) {
 	var systemMessage openai.ChatCompletionMessage
 
 	// Set the terminal to raw mode.
-	oldState, err := term.MakeRaw(0)
+	fd := int(os.Stdin.Fd())
+	oldState, err := term.MakeRaw(fd)
 	if err != nil {
 		panic(err)
 	}
-	defer term.Restore(0, oldState)
+	defer term.Restore(fd, oldState)
 
-	termWidth, termHeight, err := term.GetSize(0)
+	termWidth, termHeight, err := term.GetSize(int(os.Stdout.Fd()))
 	if err != nil {
 		panic(err)
 	}
