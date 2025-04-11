@@ -14,7 +14,7 @@ $ go install github.com/picatz/openai/cmd/openai@latest
 > [!TIP]
 > You can customize which model is used by setting the `OPENAI_MODEL` environment variable. The default is `gpt-4o` today, but it may change in the future.
 
-#### Usage
+### Usage
 
 ```console
 $ openai --help
@@ -76,3 +76,17 @@ Use "openai assistant [command] --help" for more information about a command.
 >
 > If provided no arguments, the CLI will default to the `assistant` command with an ephemeral session,
 > meaning messages and files will be deleted after exiting the session.
+
+#### With Ollama
+
+You can use the CLI with [Ollama](https://ollama.com/) to use models that are run locally, such as [IBM Granite](https://ollama.com/library/granite3.1-dense).
+
+```console
+$ brew install ollama
+...
+$ ollama serve &
+...
+$ ollama run granite3.1-dense:2b
+...
+$ OPENAI_MODEL="granite3.1-dense:2b" OPENAI_API_URL="http://localhost:11434/v1/" openai chat
+```

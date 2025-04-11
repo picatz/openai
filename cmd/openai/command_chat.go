@@ -20,7 +20,7 @@ var chatCommand = &cobra.Command{
 	Use:   "chat",
 	Short: "Chat with the OpenAI API",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		startChat(client, model)
+		startChat(cmd.Context(), client, model)
 
 		return nil
 	},
@@ -44,7 +44,7 @@ func newMessageUnion(messages []openai.ChatCompletionMessage) []openai.ChatCompl
 
 // startChat starts an interactive chat session with the OpenAI API, this is a REPL-like
 // command-line program that allows you to chat with the API.
-func startChat(client *openai.Client, model string) {
+func startChat(ctx context.Context, client *openai.Client, model string) {
 
 	// Keep track of the chat messages, both from the user and the API.
 	messages := []openai.ChatCompletionMessage{}
@@ -257,7 +257,7 @@ func startChat(client *openai.Client, model string) {
 			Content: input,
 		})
 
-		resp, err := chatRequest(client, model, messages)
+		resp, err := chatRequest(ctx, client, model, messages)
 
 		if err != nil {
 			bt.WriteString(err.Error())
@@ -283,7 +283,7 @@ func startChat(client *openai.Client, model string) {
 		tokens += resp.Usage.TotalTokens
 
 		if tokens >= 8000 {
-			summary, summaryTokens := summarizeMessages(client, model, messages, 0)
+			summary, summaryTokens := summarizeMessages(ctx, client, model, messages, 0)
 
 			// Print the generated summary so the user can see what the bot is
 			// thinking the conversation is about to inject any additional context
@@ -337,13 +337,7 @@ func startChat(client *openai.Client, model string) {
 	}
 }
 
-func chatRequest(client *openai.Client, model string, messages []openai.ChatCompletionMessage) (*openai.ChatCompletion, error) {
-	// Wait maxiumum of 5 minutes for a response, which provides
-	// a lot of time for the API to respond, but it should a matter
-	// of seconds, not minutes.
-	ctx, cancel := reqCtx(5 * time.Minute)
-	defer cancel()
-
+func chatRequest(ctx context.Context, client *openai.Client, model string, messages []openai.ChatCompletionMessage) (*openai.ChatCompletion, error) {
 	// Create completion request.
 	resp, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 		Model:     openai.F(model),
@@ -357,16 +351,8 @@ func chatRequest(client *openai.Client, model string, messages []openai.ChatComp
 	return resp, nil
 }
 
-func reqCtx(timeout time.Duration) (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), timeout)
-}
-
 // summarizeMessages summarizes the messages using the OpenAI API.
-func summarizeMessages(client *openai.Client, model string, messages []openai.ChatCompletionMessage, attempts int) (string, int64) {
-	// Create a context with a timeout of 5 minutes.
-	ctx, cancel := reqCtx(5 * time.Minute)
-	defer cancel()
-
+func summarizeMessages(ctx context.Context, client *openai.Client, model string, messages []openai.ChatCompletionMessage, attempts int) (string, int64) {
 	summaryMsgs := []openai.ChatCompletionMessage{
 		{
 			Role: openai.ChatCompletionMessageRole(openai.ChatCompletionMessageParamRoleSystem),
@@ -420,7 +406,7 @@ func summarizeMessages(client *openai.Client, model string, messages []openai.Ch
 			time.Sleep(5 * time.Second)
 
 			// Try again.
-			return summarizeMessages(client, model, messages, attempts)
+			return summarizeMessages(ctx, client, model, messages, attempts)
 		}
 
 		panic(err)
