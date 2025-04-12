@@ -17,8 +17,13 @@ import (
 	"golang.org/x/term"
 )
 
-// defaultCachePath defines the default location for the chat session cache.
-var defaultCachePath = os.Getenv("HOME") + "/.openai-cli-chat-cache"
+// defaultCachePath defines the default location for the chat session cache,
+// which is used to store conversation history.
+//
+// On Unix-like systems, it is set to ~/.openai-cli-chat-cache, and on Windows,
+// it is set to %USERPROFILE%/.openai-cli-chat-cache, which are the common locations
+// for user-specific configuration files.
+var defaultCachePath = cmp.Or(os.Getenv("HOME"), os.Getenv("USERPROFILE")) + "/.openai-cli-chat-cache"
 
 // newMessageUnion converts a slice of ChatCompletionMessage into the expected union slice.
 func newMessageUnion(messages []openai.ChatCompletionMessage) []openai.ChatCompletionMessageParamUnion {
