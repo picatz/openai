@@ -5,8 +5,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cockroachdb/pebble"
+	"github.com/cockroachdb/pebble/vfs"
 	"github.com/openai/openai-go"
 	"github.com/picatz/openai/internal/chat"
+	"github.com/picatz/openai/internal/chat/storage"
+	pebbleStorage "github.com/picatz/openai/internal/chat/storage/pebble"
 	"github.com/shoenig/test/must"
 )
 
@@ -25,7 +29,20 @@ func TestChatSession(t *testing.T) {
 		}
 	}
 
-	chatSession, restore, err := chat.NewSession(t.Context(), client, "gpt-4o", input, output)
+	pebbleOptions := &pebble.Options{
+		FS: vfs.NewMem(),
+	}
+
+	codec := &storage.JSONCodec[string, chat.ReqRespPair]{}
+
+	memBackend, err := pebbleStorage.NewBackend("", pebbleOptions, codec)
+	must.NoError(t, err)
+	must.NotNil(t, memBackend)
+	t.Cleanup(func() {
+		must.NoError(t, memBackend.Close(t.Context()))
+	})
+
+	chatSession, restore, err := chat.NewSession(t.Context(), client, "gpt-4o", input, output, memBackend)
 	must.NoError(t, err)
 	t.Cleanup(restore)
 	must.NotNil(t, chatSession)
