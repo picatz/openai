@@ -340,9 +340,9 @@ func NewSession(ctx context.Context, client *openai.Client, model string, r io.R
 	)
 
 	// If we're running in a terminal, set it to "raw" mode.
-	if stdin, ok := r.(*os.File); ok {
+	if stdout, ok := w.(*os.File); ok {
 		// Get the file descriptor (number) for the terminal.
-		fd := int(stdin.Fd())
+		fd := int(stdout.Fd())
 
 		// Set the terminal to raw mode.
 		oldState, err := term.MakeRaw(fd)

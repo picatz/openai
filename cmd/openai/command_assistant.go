@@ -702,7 +702,7 @@ func startAssistantChat(client *openai.Client, model, assistantID, threadID stri
 	}
 
 	// Set the terminal to raw mode.
-	fd := int(os.Stdin.Fd())
+	fd := int(os.Stdout.Fd())
 	oldState, err := term.MakeRaw(fd)
 	if err != nil {
 		return fmt.Errorf("failed to set terminal to raw mode: %w", err)

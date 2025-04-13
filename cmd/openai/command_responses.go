@@ -100,7 +100,7 @@ var responsesDeleteCommand = &cobra.Command{
 
 func startResonsesChat(ctx context.Context, client *responses.Client, model string) {
 	// Set the terminal to raw mode.
-	fd := int(os.Stdin.Fd())
+	fd := int(os.Stdout.Fd())
 	oldState, err := term.MakeRaw(fd)
 	if err != nil {
 		panic(err)
