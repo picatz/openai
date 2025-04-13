@@ -157,7 +157,7 @@ var builtinCommands = []Command{
 			// s.OutWriter.Flush()
 
 			emedResp, err := s.Client.Embeddings.New(ctx, openai.EmbeddingNewParams{
-				Model: openai.F(cmp.Or(os.Getenv("OPENAI_EMBEDDING_MODEL"), openai.EmbeddingModelTextEmbedding3Large)),
+				Model: openai.F(cmp.Or(os.Getenv("OPENAI_EMBEDDING_MODEL"), os.Getenv("OPENAI_MODEL"), openai.EmbeddingModelTextEmbedding3Large)),
 				Input: openai.F(openai.EmbeddingNewParamsInputUnion(openai.EmbeddingNewParamsInputArrayOfStrings{query})),
 			})
 			if err != nil {
@@ -587,7 +587,7 @@ func (cs *Session) chatRequest(ctx context.Context, nextUserMessage openai.ChatC
 	cs.CurrentTokensUsed += resp.Usage.TotalTokens
 
 	embedResp, err := cs.Client.Embeddings.New(ctx, openai.EmbeddingNewParams{
-		Model: openai.F(cmp.Or(os.Getenv("OPENAI_EMBEDDING_MODEL"), openai.EmbeddingModelTextEmbedding3Large)),
+		Model: openai.F(cmp.Or(os.Getenv("OPENAI_EMBEDDING_MODEL"), os.Getenv("OPENAI_MODEL"), openai.EmbeddingModelTextEmbedding3Large)),
 		Input: openai.F(
 			openai.EmbeddingNewParamsInputUnion(
 				openai.EmbeddingNewParamsInputArrayOfStrings{
@@ -615,7 +615,7 @@ func (cs *Session) chatRequest(ctx context.Context, nextUserMessage openai.ChatC
 		ReqTokens:      resp.Usage.PromptTokens,
 		Resp:           resp.Choices[0].Message,
 		RespTokens:     resp.Usage.CompletionTokens,
-		EmbeddingModel: cmp.Or(os.Getenv("OPENAI_EMBEDDING_MODEL"), openai.EmbeddingModelTextEmbedding3Large),
+		EmbeddingModel: cmp.Or(os.Getenv("OPENAI_EMBEDDING_MODEL"), os.Getenv("OPENAI_MODEL"), openai.EmbeddingModelTextEmbedding3Large),
 		Embedding:      embedResp.Data[0].Embedding,
 	}); err != nil {
 		return fmt.Errorf("failed to save chat response to backend storage: %w", err)
