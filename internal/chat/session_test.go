@@ -42,7 +42,7 @@ func TestChatSession(t *testing.T) {
 		must.NoError(t, memBackend.Close(t.Context()))
 	})
 
-	chatSession, restore, err := chat.NewSession(t.Context(), client, "gpt-4o", input, output, memBackend)
+	chatSession, restore, err := chat.NewSession(t.Context(), client, openai.ChatModelGPT4o, openai.EmbeddingModelTextEmbedding3Small, input, output, memBackend)
 	must.NoError(t, err)
 	t.Cleanup(restore)
 	must.NotNil(t, chatSession)

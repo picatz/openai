@@ -574,15 +574,15 @@ answer questions, perform tasks, and even generate code.
 				threadID = cmd.Flag("thread").Value.String()
 			}
 
-			return startAssistantChat(client, model, assistantID, threadID)
+			return startAssistantChat(client, chatModel, assistantID, threadID)
 		}
 
-		return startAssistantChat(client, model, "", "")
+		return startAssistantChat(client, chatModel, "", "")
 	},
 }
 
 func init() {
-	assistantChatCommand.Flags().String("model", model, "the model to use for the assistant")
+	assistantChatCommand.Flags().String("model", chatModel, "the model to use for the assistant")
 	assistantChatCommand.Flags().StringP("thread", "t", "", "the thread ID to use for the assistant")
 
 	assistantChatCommand.AddCommand(assistantChatThreadCommand)
@@ -606,7 +606,7 @@ This can be used to both quickly create a temporary assistant and  manage long-l
   $ openai assistant delete <assistant-id>
 	`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return startAssistantChat(client, model, "", "")
+		return startAssistantChat(client, chatModel, "", "")
 	},
 }
 

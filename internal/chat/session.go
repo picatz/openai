@@ -7,8 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"iter"
-	"math"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -141,51 +140,6 @@ var builtinCommands = []Command{
 		},
 	},
 	{
-		Name:        "search",
-		Description: "Search the chat history for a specific message or keyword.",
-		Matches: func(input string) bool {
-			return strings.HasPrefix(strings.TrimSpace(input), "search:")
-		},
-		Run: func(ctx context.Context, s *Session, input string) {
-			query := strings.TrimSpace(strings.TrimPrefix(input, "search:"))
-			if query == "" {
-				s.OutWriter.WriteString("Please provide a search query.\n")
-				return
-			}
-
-			// s.OutWriter.WriteString(fmt.Sprintf("Searching for: %s\n", query))
-			// s.OutWriter.Flush()
-
-			emedResp, err := s.Client.Embeddings.New(ctx, openai.EmbeddingNewParams{
-				Model: openai.F(cmp.Or(os.Getenv("OPENAI_EMBEDDING_MODEL"), os.Getenv("OPENAI_MODEL"), openai.EmbeddingModelTextEmbedding3Large)),
-				Input: openai.F(openai.EmbeddingNewParamsInputUnion(openai.EmbeddingNewParamsInputArrayOfStrings{query})),
-			})
-			if err != nil {
-				s.OutWriter.WriteString(fmt.Sprintf("Error creating embedding: %s\n", err))
-				return
-			}
-
-			// Search the cache for matching entries.
-			results := s.searchCache(ctx, 10, func(key string, pair ReqRespPair) bool {
-				return MatchQueryCosignSimilarity(s, pair.EmbeddingModel, emedResp.Data[0].Embedding, pair)
-			})
-
-			var numMatches int
-
-			for key, value := range results {
-				s.OutWriter.WriteString(fmt.Sprintf("\t%s (%s): %s\n\n", value.Req.Role, key, value.Req.Content))
-				s.OutWriter.WriteString(fmt.Sprintf("\t%s (%s): %s\n\n", value.Resp.Role, key, value.Resp.Content))
-				s.OutWriter.WriteString(fmt.Sprintf("\tTokens used: %d\n\n", value.ReqTokens+value.RespTokens))
-				s.OutWriter.WriteString("---\n")
-				numMatches++
-			}
-
-			if numMatches > 0 {
-				s.OutWriter.WriteString(fmt.Sprintf("\nFound %d matches.\n", numMatches))
-			}
-		},
-	},
-	{
 		Name:        "delete",
 		Description: "Delete the last message.",
 		Run: func(ctx context.Context, s *Session, input string) {
@@ -306,14 +260,15 @@ type ReqRespPair struct {
 	Resp           openai.ChatCompletionMessage `json:"resp,omitzero"`
 	RespTokens     int64                        `json:"resp_tokens,omitzero"`
 	EmbeddingModel string                       `json:"embedding_model,omitzero"`
-	Embedding      []float64                    `json:"embedding,omitzero"`
+	Embeddings     [][]float64                  `json:"embedding,omitzero"`
 }
 
 // Session encapsulates the state and behavior of a CLI chat session.
 // It manages terminal I/O, conversation history, caching, and command processing.
 type Session struct {
 	Client                     *openai.Client
-	Model                      string
+	ChatModel                  string
+	EmbeddingModel             string
 	StorageBackend             storage.Backend[string, ReqRespPair]
 	Messages                   []openai.ChatCompletionMessage
 	CurrentTokensUsed          int64
@@ -332,7 +287,7 @@ type Session struct {
 // and registers the default commands.
 //
 // A restoration function is returned to restore the terminal state on exit.
-func NewSession(ctx context.Context, client *openai.Client, model string, r io.Reader, w io.Writer, b storage.Backend[string, ReqRespPair]) (*Session, func(), error) {
+func NewSession(ctx context.Context, client *openai.Client, chatModel, embeddingModel string, r io.Reader, w io.Writer, b storage.Backend[string, ReqRespPair]) (*Session, func(), error) {
 	var (
 		restoreFunc     = func() {} // Default no-op restore function.
 		termWidth   int = 80        // Terminal width (default 80).
@@ -388,7 +343,8 @@ func NewSession(ctx context.Context, client *openai.Client, model string, r io.R
 	// Create a new chat session.
 	cs := &Session{
 		Client:            client,
-		Model:             model,
+		ChatModel:         chatModel,
+		EmbeddingModel:    embeddingModel,
 		StorageBackend:    b,
 		Messages:          []openai.ChatCompletionMessage{},
 		CurrentTokensUsed: 0,
@@ -421,7 +377,13 @@ func (cs *Session) ShowHelp() {
 	}
 
 	cs.OutWriter.WriteString("\nUse '" + lipgloss.NewStyle().Faint(true).Render("<clipboard>") +
-		"' to include clipboard content in a message.\n\n")
+		"' to include clipboard content in a message.\n")
+
+	cs.OutWriter.WriteString("Use '" + lipgloss.NewStyle().Faint(true).Render("#file:path") +
+		"' to include file content in a message.\n")
+
+	cs.OutWriter.WriteString("Use '" + lipgloss.NewStyle().Faint(true).Render("#url:path") +
+		"' to include URL content in a message.\n\n")
 
 	cs.OutWriter.Flush()
 }
@@ -493,14 +455,16 @@ func (cs *Session) RunOnce(ctx context.Context) (bool, error) {
 		return doneWithoutError()
 	}
 
+	processedInput := ptr(input)
+
 	// Process abstracted commands; if a command is executed, skip further processing.
-	if cs.processInput(ctx, ptr(input)) {
+	if cs.processInput(ctx, processedInput) {
 		return ranSuccessfully()
 	}
 
 	nextUserMessage := openai.ChatCompletionMessage{
 		Role:    openai.ChatCompletionMessageRole(openai.ChatCompletionMessageParamRoleUser),
-		Content: input,
+		Content: *processedInput,
 	}
 
 	// Send the chat request and display the bot's response, storing the conversation history.
@@ -539,6 +503,25 @@ func (cs *Session) processInput(ctx context.Context, input *string) bool {
 			return true
 		}
 	}
+
+	// If there's a `#file:path` token in the input, handle it; we'll replace the input with that file's contents,
+	// and path name presented to the file for context to handle the compleition.
+	err := cs.addFiles(input)
+	if err != nil {
+		cs.OutWriter.WriteString(fmt.Sprintf("Error adding files: %s\n", err))
+		cs.OutWriter.Flush()
+		return false
+	}
+
+	// If there's a `#url:path` token in the input, handle it; we'll replace the input with that URL's contents,
+	// and path name presented to the URL for context to handle the completion.
+	err = cs.addURLs(input)
+	if err != nil {
+		cs.OutWriter.WriteString(fmt.Sprintf("Error adding URLs: %s\n", err))
+		cs.OutWriter.Flush()
+		return false
+	}
+
 	// Optionally, handle clipboard token replacement if needed.
 	if strings.Contains(*input, "<clipboard>") {
 		clip, err := readClipboard()
@@ -552,6 +535,83 @@ func (cs *Session) processInput(ctx context.Context, input *string) bool {
 	return false
 }
 
+// addFiles to input replaces the #file:$path commands with the file's contents.
+//
+// If there's a space in the path, the path must be wrapped in quotes.
+func (cs *Session) addFiles(input *string) error {
+	if input == nil || !strings.Contains(*input, "#file:") {
+		return nil
+	}
+
+	fields := strings.Fields(*input)
+	for _, field := range fields {
+		if strings.HasPrefix(field, "#file:") {
+			filePath := strings.TrimPrefix(field, "#file:")
+
+			// cs.OutWriter.Write([]byte(fmt.Sprintf("Reading file: %s\n", filePath)))
+			// cs.OutWriter.Flush()
+
+			file, err := os.Open(filePath)
+			if err != nil {
+				return fmt.Errorf("failed to open file %q: %w", filePath, err)
+			}
+			defer file.Close()
+
+			scanner := bufio.NewScanner(file)
+			var fileContent strings.Builder
+			for scanner.Scan() {
+				fileContent.WriteString(scanner.Text() + "\n")
+			}
+			if err := scanner.Err(); err != nil {
+				return fmt.Errorf("error reading file %q: %w", filePath, err)
+			}
+
+			// Replace the #file: directive in the input with the file's content
+			*input = strings.Replace(*input, field, fileContent.String(), 1)
+		}
+	}
+
+	return nil
+}
+
+// addURLS makes GET requests to the URLs in the input and replaces them with the response content.
+func (cs *Session) addURLs(input *string) error {
+	if input == nil || !strings.Contains(*input, "#url:") {
+		return nil
+	}
+
+	fields := strings.Fields(*input)
+	for _, field := range fields {
+		if strings.HasPrefix(field, "#url:") {
+			url := strings.TrimPrefix(field, "#url:")
+
+			if !strings.HasPrefix(url, "http://") || !strings.HasPrefix(url, "https://") {
+				url = fmt.Sprint("https://", url)
+			}
+
+			if strings.HasPrefix(url, "http://") {
+				url = strings.Replace(url, "http://", "https://", 1)
+			}
+
+			resp, err := http.Get(url)
+			if err != nil {
+				return fmt.Errorf("failed to fetch URL %q: %w", url, err)
+			}
+			defer resp.Body.Close()
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return fmt.Errorf("error reading response body from URL %q: %w", url, err)
+			}
+
+			// Replace the #url: directive in the input with the response content
+			*input = strings.Replace(*input, field, string(body), 1)
+		}
+	}
+
+	return nil
+}
+
 // ptr is a helper function to create a pointer to a value, because
 // we're using a pointer to process the input (in case we need to modify it).
 func ptr[T any](v T) *T {
@@ -563,7 +623,7 @@ func (cs *Session) chatRequest(ctx context.Context, nextUserMessage openai.ChatC
 	cs.Messages = append(cs.Messages, nextUserMessage)
 
 	resp, err := cs.Client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-		Model:    openai.F(cs.Model),
+		Model:    openai.F(cs.ChatModel),
 		Messages: openai.F(newMessageUnion(cs.Messages)),
 		// TODO(kent): consider this more.
 		//
@@ -586,19 +646,55 @@ func (cs *Session) chatRequest(ctx context.Context, nextUserMessage openai.ChatC
 	cs.Messages = append(cs.Messages, resp.Choices[0].Message)
 	cs.CurrentTokensUsed += resp.Usage.TotalTokens
 
-	embedResp, err := cs.Client.Embeddings.New(ctx, openai.EmbeddingNewParams{
-		Model: openai.F(cmp.Or(os.Getenv("OPENAI_EMBEDDING_MODEL"), os.Getenv("OPENAI_MODEL"), openai.EmbeddingModelTextEmbedding3Large)),
-		Input: openai.F(
-			openai.EmbeddingNewParamsInputUnion(
-				openai.EmbeddingNewParamsInputArrayOfStrings{
-					nextUserMessage.Content,
-					resp.Choices[0].Message.Content,
-				},
-			),
-		),
-	})
+	embeddings := [][]float64{}
+
+	// Split the input into chunks to avoid exceeding the token limit (8192 tokens)?
+	// resp.Usage.PromptTokens tells us how many tokens are in the promopt, which can guide
+	// the chunking.
+	promptChunks, err := chunkString(nextUserMessage.Content, resp.Usage.PromptTokens, 4096)
 	if err != nil {
-		return fmt.Errorf("failed to create embedding for message: %w", err)
+		return fmt.Errorf("failed to chunk prompt: %w", err)
+	}
+	for _, chunk := range promptChunks {
+		embedResp, err := cs.Client.Embeddings.New(ctx, openai.EmbeddingNewParams{
+			Model: openai.F(cs.EmbeddingModel),
+			Input: openai.F(
+				openai.EmbeddingNewParamsInputUnion(
+					openai.EmbeddingNewParamsInputArrayOfStrings{
+						chunk,
+					},
+				),
+			),
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create embedding for message: %w", err)
+		}
+		for _, embedding := range embedResp.Data {
+			embeddings = append(embeddings, embedding.Embedding)
+		}
+	}
+
+	responseChunks, err := chunkString(resp.Choices[0].Message.Content, resp.Usage.CompletionTokens, 4096)
+	if err != nil {
+		return fmt.Errorf("failed to chunk response: %w", err)
+	}
+	for _, chunk := range responseChunks {
+		embedResp, err := cs.Client.Embeddings.New(ctx, openai.EmbeddingNewParams{
+			Model: openai.F(cs.EmbeddingModel),
+			Input: openai.F(
+				openai.EmbeddingNewParamsInputUnion(
+					openai.EmbeddingNewParamsInputArrayOfStrings{
+						chunk,
+					},
+				),
+			),
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create embedding for message: %w", err)
+		}
+		for _, embedding := range embedResp.Data {
+			embeddings = append(embeddings, embedding.Embedding)
+		}
 	}
 
 	// The reqRespPairKey is a K-Sortable Unique IDentifier (KSUID) for the request and response.
@@ -610,13 +706,13 @@ func (cs *Session) chatRequest(ctx context.Context, nextUserMessage openai.ChatC
 
 	// Save the request and response to the backend storage.
 	if err := cs.StorageBackend.Set(ctx, reqRespPairKey, ReqRespPair{
-		Model:          cs.Model,
+		Model:          cs.ChatModel,
 		Req:            nextUserMessage,
 		ReqTokens:      resp.Usage.PromptTokens,
 		Resp:           resp.Choices[0].Message,
 		RespTokens:     resp.Usage.CompletionTokens,
-		EmbeddingModel: cmp.Or(os.Getenv("OPENAI_EMBEDDING_MODEL"), os.Getenv("OPENAI_MODEL"), openai.EmbeddingModelTextEmbedding3Large),
-		Embedding:      embedResp.Data[0].Embedding,
+		EmbeddingModel: cs.EmbeddingModel,
+		Embeddings:     embeddings,
 	}); err != nil {
 		return fmt.Errorf("failed to save chat response to backend storage: %w", err)
 	}
@@ -625,6 +721,46 @@ func (cs *Session) chatRequest(ctx context.Context, nextUserMessage openai.ChatC
 	// cs.OutWriter.Flush()
 
 	return nil
+}
+
+// chunkString takes a given string (and number of tokens it contains), and splits it into
+// smaller strings that are within the given max token limit. This is useful for embeddings
+// which require smaller context windows than their chat counterparts.
+func chunkString(s string, tokens, maxTokens int64) ([]string, error) {
+	if maxTokens <= 0 {
+		return nil, fmt.Errorf("maxTokens must be greater than 0")
+	}
+
+	// Split the string into words
+	words := strings.Fields(s)
+	var chunks []string
+	var currentChunk []string
+	var currentTokens int64
+
+	for _, word := range words {
+		// Estimate token count for the word (1 word = 1 token approximation)
+		wordTokens := int64(len(word)) / 2 // Rough estimate: 2 characters per token
+
+		// Check if adding this word exceeds the maxTokens limit
+		if currentTokens+wordTokens > maxTokens {
+			// Add the current chunk to the list of chunks
+			chunks = append(chunks, strings.Join(currentChunk, " "))
+			// Reset the current chunk and token count
+			currentChunk = []string{}
+			currentTokens = 0
+		}
+
+		// Add the word to the current chunk
+		currentChunk = append(currentChunk, word)
+		currentTokens += wordTokens
+	}
+
+	// Add the last chunk if it exists
+	if len(currentChunk) > 0 {
+		chunks = append(chunks, strings.Join(currentChunk, " "))
+	}
+
+	return chunks, nil
 }
 
 // maybeSummarize checks if the token count exceeds a threshold and, if so, generates a summary.
@@ -678,7 +814,7 @@ func (cs *Session) summarize(ctx context.Context, attempts int) (string, int64, 
 
 	attempts++
 	resp, err := cs.Client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-		Model:     openai.F(cs.Model),
+		Model:     openai.F(cs.ChatModel),
 		Messages:  openai.F(newMessageUnion(summaryMsgs)),
 		MaxTokens: openai.F(int64(2048)),
 	})
@@ -726,79 +862,6 @@ func (cs *Session) saveCache(ctx context.Context) error {
 		return fmt.Errorf("failed to save chat cache: %w", err)
 	}
 	return nil
-}
-
-func cosignSimilarity(a, b []float64) float64 {
-	var (
-		dotProduct float64
-		magnitudeA float64
-		magnitudeB float64
-	)
-
-	for i := range a {
-		dotProduct += a[i] * b[i]
-		magnitudeA += a[i] * a[i]
-		magnitudeB += b[i] * b[i]
-	}
-
-	return dotProduct / (math.Sqrt(magnitudeA) * math.Sqrt(magnitudeB))
-}
-
-func MatchQueryCosignSimilarity(s *Session, embeddingModel string, query []float64, pair ReqRespPair) bool {
-	if embeddingModel != pair.EmbeddingModel {
-		return false
-	}
-
-	value := cosignSimilarity(query, pair.Embedding)
-
-	// s.OutWriter.Write([]byte(fmt.Sprintf("Cosine similarity: %f\n", value)))
-	// s.OutWriter.Flush()
-
-	return value > 0.8
-}
-
-func (cs *Session) searchCache(ctx context.Context, n int, match func(key string, pair ReqRespPair) bool) iter.Seq2[string, ReqRespPair] {
-	return func(yield func(string, ReqRespPair) bool) {
-		var (
-			perPage       = storage.PageSize(10)
-			nextPageToken *string
-		)
-
-		matched := 0
-
-		for {
-			entries, nextPageToken, err := cs.StorageBackend.List(ctx, perPage, nextPageToken)
-			if err != nil {
-				cs.OutWriter.Write(fmt.Appendf(nil, "Error listing entries: %s\n", err))
-				cs.OutWriter.Flush()
-				// Return an error if the listing fails.
-				return
-			}
-
-			for key, pair := range entries {
-				if match(key, pair) {
-					if !yield(key, pair) {
-						return
-					}
-				}
-
-				matched++
-
-				if matched >= n {
-					return
-				}
-			}
-
-			if nextPageToken == nil {
-				break
-			}
-		}
-
-		if matched == 0 {
-			cs.OutWriter.Write([]byte("No matches found.\n"))
-			cs.OutWriter.Flush()
-		}
-	}
 }
 
 // autoComplete provides basic tab-completion for common commands.

@@ -33,7 +33,8 @@ var chatCommand = &cobra.Command{
 		codec := &storage.JSONCodec[string, chat.ReqRespPair]{}
 
 		var opts = &pebble.Options{
-			LoggerAndTracer: &stderrLoggerAndTracer{},
+			LoggerAndTracer:    &stderrLoggerAndTracer{},
+			FormatMajorVersion: pebble.FormatVirtualSSTables,
 		}
 
 		if useTemp, _ := cmd.Flags().GetBool("temporary"); useTemp {
@@ -46,7 +47,7 @@ var chatCommand = &cobra.Command{
 		}
 		defer storageBackend.Close(cmd.Context())
 
-		chatSession, restore, err := chat.NewSession(cmd.Context(), client, model, cmd.InOrStdin(), cmd.OutOrStdout(), storageBackend)
+		chatSession, restore, err := chat.NewSession(cmd.Context(), client, chatModel, embeddingModel, cmd.InOrStdin(), cmd.OutOrStdout(), storageBackend)
 		if err != nil {
 			return fmt.Errorf("failed to create chat session: %w", err)
 		}
