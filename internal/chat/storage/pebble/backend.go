@@ -10,29 +10,29 @@ import (
 )
 
 // Ensure that Backend implements the storage.Backend interface.
-var _ storage.Backend[string, any] = (*Backend[string, any, storage.Codec[string, any]])(nil)
+var _ storage.Backend[string, any] = (*Backend[string, any])(nil)
 
 // Backend is a storage backend that uses Pebble as the underlying storage engine.
 //
 // Pebble can use an in-memory filesystem or a directory on disk for storage, depending
 // on the options provided. By default, this application uses a directory on disk.
-type Backend[K comparable, V any, C storage.Codec[K, V]] struct {
+type Backend[K comparable, V any] struct {
 	db    *pebble.DB
-	codec C
+	codec storage.Codec[K, V]
 }
 
 // NewBackend creates a new Pebble storage backend.
-func NewBackend[K comparable, V any, C storage.Codec[K, V]](dirname string, opts *pebble.Options, codec C) (*Backend[K, V, C], error) {
+func NewBackend[K comparable, V any](dirname string, opts *pebble.Options, codec storage.Codec[K, V]) (*Backend[K, V], error) {
 	db, err := pebble.Open(dirname, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open pebble database: %w", err)
 	}
 
-	return &Backend[K, V, C]{db: db, codec: codec}, nil
+	return &Backend[K, V]{db: db, codec: codec}, nil
 }
 
 // Get retrieves a value from the storage backend by its key.
-func (b *Backend[K, V, C]) Get(ctx context.Context, key K) (V, bool, error) {
+func (b *Backend[K, V]) Get(ctx context.Context, key K) (V, bool, error) {
 	var zero V
 
 	keyBytes, err := b.codec.EncodeKey(key)
@@ -55,7 +55,7 @@ func (b *Backend[K, V, C]) Get(ctx context.Context, key K) (V, bool, error) {
 }
 
 // Set stores a key-value pair in the storage backend.
-func (b *Backend[K, V, C]) Set(ctx context.Context, key K, value V) error {
+func (b *Backend[K, V]) Set(ctx context.Context, key K, value V) error {
 	keyBytes, err := b.codec.EncodeKey(key)
 	if err != nil {
 		return fmt.Errorf("failed to encode key: %w", err)
@@ -74,7 +74,7 @@ func (b *Backend[K, V, C]) Set(ctx context.Context, key K, value V) error {
 }
 
 // Delete removes a key-value pair from the storage backend.
-func (b *Backend[K, V, C]) Delete(ctx context.Context, key K) error {
+func (b *Backend[K, V]) Delete(ctx context.Context, key K) error {
 	keyBytes, err := b.codec.EncodeKey(key)
 	if err != nil {
 		return fmt.Errorf("failed to encode key: %w", err)
@@ -91,7 +91,7 @@ func (b *Backend[K, V, C]) Delete(ctx context.Context, key K) error {
 const DefaultListPageSize = 25
 
 // List retrieves a list of key-value pairs from the storage backend.
-func (b *Backend[K, V, C]) List(ctx context.Context, pageSize *int, pageToken *K) (iter.Seq2[K, V], *K, error) {
+func (b *Backend[K, V]) List(ctx context.Context, pageSize *int, pageToken *K) (iter.Seq2[K, V], *K, error) {
 	iterOpts := &pebble.IterOptions{}
 
 	if pageToken != nil {
@@ -167,7 +167,7 @@ func (b *Backend[K, V, C]) List(ctx context.Context, pageSize *int, pageToken *K
 }
 
 // Flush flushes the storage backend.
-func (b *Backend[K, V, C]) Flush(ctx context.Context) error {
+func (b *Backend[K, V]) Flush(ctx context.Context) error {
 	if err := b.db.Flush(); err != nil {
 		return fmt.Errorf("failed to flush pebble database: %w", err)
 	}
@@ -175,7 +175,7 @@ func (b *Backend[K, V, C]) Flush(ctx context.Context) error {
 }
 
 // Close closes the storage backend.
-func (b *Backend[K, V, C]) Close(ctx context.Context) error {
+func (b *Backend[K, V]) Close(ctx context.Context) error {
 	if err := b.db.Close(); err != nil {
 		return fmt.Errorf("failed to close pebble database: %w", err)
 	}

@@ -47,7 +47,7 @@ var chatCommand = &cobra.Command{
 		}
 		defer storageBackend.Close(cmd.Context())
 
-		chatSession, restore, err := chat.NewSession(cmd.Context(), client, chatModel, embeddingModel, cmd.InOrStdin(), cmd.OutOrStdout(), storageBackend)
+		chatSession, restore, err := chat.NewSession(cmd.Context(), client, chatModel, cmd.InOrStdin(), cmd.OutOrStdout(), storageBackend)
 		if err != nil {
 			return fmt.Errorf("failed to create chat session: %w", err)
 		}

@@ -88,5 +88,5 @@ $ ollama serve &
 ...
 $ ollama run granite3.1-dense:2b
 ...
-$ OPENAI_MODEL="granite3.1-dense:2b" OPENAI_EMBEDDING_MODEL="granite3.1-dense:2b" OPENAI_API_URL="http://localhost:11434/v1/" openai chat
+$ OPENAI_MODEL="granite3.1-dense:2b" OPENAI_API_URL="http://localhost:11434/v1/" openai chat
 ```

@@ -12,10 +12,9 @@ import (
 )
 
 var (
-	apiKey         = os.Getenv("OPENAI_API_KEY")
-	chatModel      = cmp.Or(os.Getenv("OPENAI_MODEL"), openai.ChatModel("gpt-4.1"))
-	embeddingModel = cmp.Or(os.Getenv("OPENAI_EMBEDDING_MODEL"), openai.EmbeddingModelTextEmbedding3Large)
-	baseURL        = os.Getenv("OPENAI_API_URL")
+	apiKey    = os.Getenv("OPENAI_API_KEY")
+	chatModel = cmp.Or(os.Getenv("OPENAI_MODEL"), openai.ChatModel("gpt-4.1"))
+	baseURL   = os.Getenv("OPENAI_API_URL")
 
 	client *openai.Client
 )

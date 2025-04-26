@@ -254,13 +254,11 @@ var builtinCommands = []Command{
 // ReqRespPair represents a request-response pair in the chat session,
 // used for storing conversation history in the backend.
 type ReqRespPair struct {
-	Model          string                       `json:"model,omitzero"`
-	Req            openai.ChatCompletionMessage `json:"req,omitzero"`
-	ReqTokens      int64                        `json:"req_tokens,omitzero"`
-	Resp           openai.ChatCompletionMessage `json:"resp,omitzero"`
-	RespTokens     int64                        `json:"resp_tokens,omitzero"`
-	EmbeddingModel string                       `json:"embedding_model,omitzero"`
-	Embeddings     [][]float64                  `json:"embedding,omitzero"`
+	Model      string                       `json:"model,omitzero"`
+	Req        openai.ChatCompletionMessage `json:"req,omitzero"`
+	ReqTokens  int64                        `json:"req_tokens,omitzero"`
+	Resp       openai.ChatCompletionMessage `json:"resp,omitzero"`
+	RespTokens int64                        `json:"resp_tokens,omitzero"`
 }
 
 // Session encapsulates the state and behavior of a CLI chat session.
@@ -268,7 +266,6 @@ type ReqRespPair struct {
 type Session struct {
 	Client                     *openai.Client
 	ChatModel                  string
-	EmbeddingModel             string
 	StorageBackend             storage.Backend[string, ReqRespPair]
 	Messages                   []openai.ChatCompletionMessage
 	CurrentTokensUsed          int64
@@ -287,7 +284,7 @@ type Session struct {
 // and registers the default commands.
 //
 // A restoration function is returned to restore the terminal state on exit.
-func NewSession(ctx context.Context, client *openai.Client, chatModel, embeddingModel string, r io.Reader, w io.Writer, b storage.Backend[string, ReqRespPair]) (*Session, func(), error) {
+func NewSession(ctx context.Context, client *openai.Client, chatModel string, r io.Reader, w io.Writer, b storage.Backend[string, ReqRespPair]) (*Session, func(), error) {
 	var (
 		restoreFunc     = func() {} // Default no-op restore function.
 		termWidth   int = 80        // Terminal width (default 80).
@@ -344,7 +341,6 @@ func NewSession(ctx context.Context, client *openai.Client, chatModel, embedding
 	cs := &Session{
 		Client:            client,
 		ChatModel:         chatModel,
-		EmbeddingModel:    embeddingModel,
 		StorageBackend:    b,
 		Messages:          []openai.ChatCompletionMessage{},
 		CurrentTokensUsed: 0,
@@ -646,57 +642,6 @@ func (cs *Session) chatRequest(ctx context.Context, nextUserMessage openai.ChatC
 	cs.Messages = append(cs.Messages, resp.Choices[0].Message)
 	cs.CurrentTokensUsed += resp.Usage.TotalTokens
 
-	embeddings := [][]float64{}
-
-	// Split the input into chunks to avoid exceeding the token limit (8192 tokens)?
-	// resp.Usage.PromptTokens tells us how many tokens are in the promopt, which can guide
-	// the chunking.
-	promptChunks, err := chunkString(nextUserMessage.Content, resp.Usage.PromptTokens, 4096)
-	if err != nil {
-		return fmt.Errorf("failed to chunk prompt: %w", err)
-	}
-	for _, chunk := range promptChunks {
-		embedResp, err := cs.Client.Embeddings.New(ctx, openai.EmbeddingNewParams{
-			Model: openai.F(cs.EmbeddingModel),
-			Input: openai.F(
-				openai.EmbeddingNewParamsInputUnion(
-					openai.EmbeddingNewParamsInputArrayOfStrings{
-						chunk,
-					},
-				),
-			),
-		})
-		if err != nil {
-			return fmt.Errorf("failed to create embedding for message: %w", err)
-		}
-		for _, embedding := range embedResp.Data {
-			embeddings = append(embeddings, embedding.Embedding)
-		}
-	}
-
-	responseChunks, err := chunkString(resp.Choices[0].Message.Content, resp.Usage.CompletionTokens, 4096)
-	if err != nil {
-		return fmt.Errorf("failed to chunk response: %w", err)
-	}
-	for _, chunk := range responseChunks {
-		embedResp, err := cs.Client.Embeddings.New(ctx, openai.EmbeddingNewParams{
-			Model: openai.F(cs.EmbeddingModel),
-			Input: openai.F(
-				openai.EmbeddingNewParamsInputUnion(
-					openai.EmbeddingNewParamsInputArrayOfStrings{
-						chunk,
-					},
-				),
-			),
-		})
-		if err != nil {
-			return fmt.Errorf("failed to create embedding for message: %w", err)
-		}
-		for _, embedding := range embedResp.Data {
-			embeddings = append(embeddings, embedding.Embedding)
-		}
-	}
-
 	// The reqRespPairKey is a K-Sortable Unique IDentifier (KSUID) for the request and response.
 	//
 	// This is useful for iterating over the cache in a sorted order, which we can
@@ -706,13 +651,11 @@ func (cs *Session) chatRequest(ctx context.Context, nextUserMessage openai.ChatC
 
 	// Save the request and response to the backend storage.
 	if err := cs.StorageBackend.Set(ctx, reqRespPairKey, ReqRespPair{
-		Model:          cs.ChatModel,
-		Req:            nextUserMessage,
-		ReqTokens:      resp.Usage.PromptTokens,
-		Resp:           resp.Choices[0].Message,
-		RespTokens:     resp.Usage.CompletionTokens,
-		EmbeddingModel: cs.EmbeddingModel,
-		Embeddings:     embeddings,
+		Model:      cs.ChatModel,
+		Req:        nextUserMessage,
+		ReqTokens:  resp.Usage.PromptTokens,
+		Resp:       resp.Choices[0].Message,
+		RespTokens: resp.Usage.CompletionTokens,
 	}); err != nil {
 		return fmt.Errorf("failed to save chat response to backend storage: %w", err)
 	}
@@ -723,10 +666,10 @@ func (cs *Session) chatRequest(ctx context.Context, nextUserMessage openai.ChatC
 	return nil
 }
 
-// chunkString takes a given string (and number of tokens it contains), and splits it into
+// ChunkString takes a given string (and number of tokens it contains), and splits it into
 // smaller strings that are within the given max token limit. This is useful for embeddings
 // which require smaller context windows than their chat counterparts.
-func chunkString(s string, tokens, maxTokens int64) ([]string, error) {
+func ChunkString(s string, maxTokens int64) ([]string, error) {
 	if maxTokens <= 0 {
 		return nil, fmt.Errorf("maxTokens must be greater than 0")
 	}
