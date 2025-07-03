@@ -287,34 +287,28 @@ func startResponsesChat(ctx context.Context, client *responses.Client, model str
 		}
 
 		// Replace special tokens before sending to the API.
-		if strings.Contains(input, "#file:") {
-			var err error
-			input, err = addFilesToInput(input)
-			if err != nil {
-				bt.WriteString("Error adding files: " + err.Error() + "\n")
-				bt.Flush()
-				continue
-			}
+		processors := []struct {
+			token   string
+			process func(string) (string, error)
+		}{
+			{"#file:", addFilesToInput},
+			{"#url:", addURLsToInput},
+			{"<clipboard>", addClipboardToInput},
 		}
 
-		if strings.Contains(input, "#url:") {
-			var err error
-			input, err = addURLsToInput(input)
-			if err != nil {
-				bt.WriteString("Error adding URLs: " + err.Error() + "\n")
-				bt.Flush()
-				continue
+		var procErr error
+		for _, p := range processors {
+			if strings.Contains(input, p.token) {
+				input, procErr = p.process(input)
+				if procErr != nil {
+					bt.WriteString(fmt.Sprintf("Error processing %s: %s\n", p.token, procErr))
+					bt.Flush()
+					break
+				}
 			}
 		}
-
-		if strings.Contains(input, "<clipboard>") {
-			clip, err := readClipboard()
-			if err == nil {
-				input = strings.ReplaceAll(input, "<clipboard>", clip)
-			} else {
-				bt.WriteString("Clipboard read error: " + err.Error() + "\n")
-				bt.Flush()
-			}
+		if procErr != nil {
+			continue
 		}
 
 		resp, err := client.Create(ctx, responses.Request{
@@ -403,8 +397,14 @@ func addURLsToInput(input string) (string, error) {
 			if err != nil {
 				return input, fmt.Errorf("failed to fetch URL %q: %w", url, err)
 			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+				io.Copy(io.Discard, resp.Body)
+				return input, fmt.Errorf("failed to fetch URL %q: %s", url, resp.Status)
+			}
+
 			body, err := io.ReadAll(resp.Body)
-			resp.Body.Close()
 			if err != nil {
 				return input, fmt.Errorf("error reading response body from URL %q: %w", url, err)
 			}
@@ -412,6 +412,16 @@ func addURLsToInput(input string) (string, error) {
 		}
 	}
 	return input, nil
+}
+
+// addClipboardToInput looks for the "<clipboard>" token in the provided input
+// and replaces it with the system clipboard contents.
+func addClipboardToInput(input string) (string, error) {
+	clip, err := readClipboard()
+	if err != nil {
+		return input, err
+	}
+	return strings.ReplaceAll(input, "<clipboard>", clip), nil
 }
 
 // printResponsesChatHelp prints available commands and token usage instructions
