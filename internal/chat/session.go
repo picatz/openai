@@ -34,7 +34,17 @@ var DefaultCachePath = cmp.Or(os.Getenv("HOME"), os.Getenv("USERPROFILE")) + "/.
 func newMessageUnion(messages []openai.ChatCompletionMessage) []openai.ChatCompletionMessageParamUnion {
 	msgUnion := make([]openai.ChatCompletionMessageParamUnion, len(messages))
 	for i, m := range messages {
-		msgUnion[i] = m
+		switch m.Role {
+		case "system":
+			msgUnion[i] = openai.SystemMessage(m.Content)
+		case "user":
+			msgUnion[i] = openai.UserMessage(m.Content)
+		case "assistant":
+			msgUnion[i] = openai.AssistantMessage(m.Content)
+		default:
+			// Fallback to user message if role is unknown
+			msgUnion[i] = openai.UserMessage(m.Content)
+		}
 	}
 	return msgUnion
 }
@@ -167,7 +177,7 @@ var builtinCommands = []Command{
 		},
 		Run: func(ctx context.Context, s *Session, input string) {
 			systemMsg := openai.ChatCompletionMessage{
-				Role:    openai.ChatCompletionMessageRole(openai.ChatCompletionMessageParamRoleSystem),
+				Role:    "system",
 				Content: input,
 			}
 			s.Messages = append(s.Messages, systemMsg)
@@ -459,7 +469,7 @@ func (cs *Session) RunOnce(ctx context.Context) (bool, error) {
 	}
 
 	nextUserMessage := openai.ChatCompletionMessage{
-		Role:    openai.ChatCompletionMessageRole(openai.ChatCompletionMessageParamRoleUser),
+		Role:    "user",
 		Content: *processedInput,
 	}
 
@@ -619,11 +629,11 @@ func (cs *Session) chatRequest(ctx context.Context, nextUserMessage openai.ChatC
 	cs.Messages = append(cs.Messages, nextUserMessage)
 
 	resp, err := cs.Client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-		Model:    openai.F(cs.ChatModel),
-		Messages: openai.F(newMessageUnion(cs.Messages)),
+		Model:    cs.ChatModel,
+		Messages: newMessageUnion(cs.Messages),
 		// TODO(kent): consider this more.
 		//
-		// MaxCompletionTokens: openai.F(cmp.Or(cs.MaxCompletionTokens, 2048)),
+		// MaxCompletionTokens: cmp.Or(cs.MaxCompletionTokens, 2048),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create chat: %w", err)
@@ -715,7 +725,7 @@ func (cs *Session) maybeSummarize(ctx context.Context) error {
 		}
 
 		cs.Messages = []openai.ChatCompletionMessage{{
-			Role:    openai.ChatCompletionMessageRole(openai.ChatCompletionMessageParamRoleSystem),
+			Role:    "system",
 			Content: "Summary of previous messages for context: " + summary,
 		}}
 		cs.CurrentTokensUsed = summaryTokens
@@ -733,7 +743,7 @@ func (cs *Session) maybeSummarize(ctx context.Context) error {
 func (cs *Session) summarize(ctx context.Context, attempts int) (string, int64, error) {
 	summaryMsgs := []openai.ChatCompletionMessage{
 		{
-			Role: openai.ChatCompletionMessageRole(openai.ChatCompletionMessageParamRoleSystem),
+			Role: "system",
 			Content: strings.Join([]string{
 				"You are an expert at summarizing conversations.",
 				"Write a detailed recap of the given conversation, including all important details.",
@@ -744,22 +754,21 @@ func (cs *Session) summarize(ctx context.Context, attempts int) (string, int64, 
 
 	var b strings.Builder
 	for _, m := range cs.Messages {
-		if m.Role == openai.ChatCompletionMessageRole(openai.ChatCompletionMessageParamRoleSystem) {
+		if m.Role == "system" {
 			continue
 		}
 		b.WriteString(string(m.Role) + ":\n" + m.Content + "\n")
 	}
 
 	summaryMsgs = append(summaryMsgs, openai.ChatCompletionMessage{
-		Role:    openai.ChatCompletionMessageRole(openai.ChatCompletionMessageParamRoleUser),
+		Role:    "user",
 		Content: b.String(),
 	})
 
 	attempts++
 	resp, err := cs.Client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-		Model:     openai.F(cs.ChatModel),
-		Messages:  openai.F(newMessageUnion(summaryMsgs)),
-		MaxTokens: openai.F(int64(2048)),
+		Model:    cs.ChatModel,
+		Messages: newMessageUnion(summaryMsgs),
 	})
 	if err != nil {
 		if attempts < 5 && strings.Contains(err.Error(), "unexpected status code: 429") {

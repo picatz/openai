@@ -46,7 +46,7 @@ func TestChatSession(t *testing.T) {
 		must.NoError(t, memBackend.Close(t.Context()))
 	})
 
-	chatSession, restore, err := chat.NewSession(t.Context(), client, openai.ChatModelGPT4o, input, output, memBackend)
+	chatSession, restore, err := chat.NewSession(t.Context(), &client, openai.ChatModelGPT4o, input, output, memBackend)
 	must.NoError(t, err)
 	t.Cleanup(restore)
 	must.NotNil(t, chatSession)
@@ -107,26 +107,18 @@ func TestChunkString_consign_similarity(t *testing.T) {
 
 	getPair := func(a, b string) cosinePair {
 		aEmbedding, err := client.Embeddings.New(t.Context(), openai.EmbeddingNewParams{
-			Model: openai.F(openai.EmbeddingModelTextEmbedding3Small),
-			Input: openai.F(
-				openai.EmbeddingNewParamsInputUnion(
-					openai.EmbeddingNewParamsInputArrayOfStrings{
-						a,
-					},
-				),
-			),
+			Model: openai.EmbeddingModelTextEmbedding3Small,
+			Input: openai.EmbeddingNewParamsInputUnion{
+				OfString: openai.String(a),
+			},
 		})
 		must.NoError(t, err)
 
 		bEmbedding, err := client.Embeddings.New(t.Context(), openai.EmbeddingNewParams{
-			Model: openai.F(openai.EmbeddingModelTextEmbedding3Small),
-			Input: openai.F(
-				openai.EmbeddingNewParamsInputUnion(
-					openai.EmbeddingNewParamsInputArrayOfStrings{
-						b,
-					},
-				),
-			),
+			Model: openai.EmbeddingModelTextEmbedding3Small,
+			Input: openai.EmbeddingNewParamsInputUnion{
+				OfString: openai.String(b),
+			},
 		})
 		must.NoError(t, err)
 

@@ -52,9 +52,8 @@ func BackendSuite_openai_chat_messages(t *testing.T, b storage.Backend[string, o
 	firstKey := "hello"
 	secondKey := "hello again"
 
-	userRole := openai.ChatCompletionMessageRole(openai.ChatCompletionMessageParamRoleUser)
-	firstMessage := openai.ChatCompletionMessage{Role: userRole, Content: "world"}
-	secondMessage := openai.ChatCompletionMessage{Role: userRole, Content: "world2"}
+	firstMessage := openai.ChatCompletionMessage{Role: "user", Content: "world"}
+	secondMessage := openai.ChatCompletionMessage{Role: "user", Content: "world2"}
 
 	err := b.Set(t.Context(), firstKey, firstMessage)
 	must.NoError(t, err)

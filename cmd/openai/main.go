@@ -13,11 +13,15 @@ import (
 
 var (
 	apiKey    = os.Getenv("OPENAI_API_KEY")
-	chatModel = cmp.Or(os.Getenv("OPENAI_MODEL"), openai.ChatModel("gpt-4.1"))
+	chatModel = cmp.Or(os.Getenv("OPENAI_MODEL"), openai.ChatModel("gpt-4o"))
 	baseURL   = os.Getenv("OPENAI_API_URL")
 
 	client *openai.Client
 )
+
+func ptr[T any](v T) *T {
+	return &v
+}
 
 func init() {
 	if apiKey == "" {
@@ -33,7 +37,7 @@ func init() {
 		clientOptions = append(clientOptions, option.WithBaseURL(baseURL))
 	}
 
-	client = openai.NewClient(clientOptions...)
+	client = ptr(openai.NewClient(clientOptions...))
 }
 
 func main() {

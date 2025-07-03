@@ -5,6 +5,7 @@ import (
 
 	"github.com/charmbracelet/glamour"
 	"github.com/openai/openai-go"
+	"github.com/openai/openai-go/packages/param"
 	"github.com/spf13/cobra"
 )
 
@@ -25,19 +26,19 @@ var imageCommand = &cobra.Command{
 		}
 
 		resp, err := client.Images.Generate(cmd.Context(), openai.ImageGenerateParams{
-			Prompt:  openai.F(prompt),
-			Model:   openai.F(model),
-			N:       openai.F(n),
-			Quality: openai.F(openai.ImageGenerateParamsQuality(quality)),
-			Style:   openai.F(openai.ImageGenerateParamsStyle(style)),
-			Size:    openai.F(openai.ImageGenerateParamsSize(size)),
+			Prompt:  prompt,
+			Model:   model,
+			N:       param.NewOpt(n),
+			Quality: openai.ImageGenerateParamsQuality(quality),
+			Style:   openai.ImageGenerateParamsStyle(style),
+			Size:    openai.ImageGenerateParamsSize(size),
 		})
 		if err != nil {
 			return err
 		}
 
 		for _, data := range resp.Data {
-			if data.JSON.RevisedPrompt.IsNull() {
+			if data.JSON.RevisedPrompt.Raw() != "" {
 				rp, err := glamour.Render(data.RevisedPrompt, "dark")
 				if err != nil {
 					return err

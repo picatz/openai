@@ -31,9 +31,9 @@ var responsesCommand = &cobra.Command{
 	Use:   "responses",
 	Short: "Manage the OpenAI Responses API",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		client := responses.NewClient(os.Getenv("OPENAI_API_KEY"), http.DefaultClient)
+		client := responses.NewClient(apiKey, http.DefaultClient)
 
-		startResonsesChat(cmd.Context(), client, "gpt-4o")
+		startResponsesChat(cmd.Context(), client, chatModel)
 
 		return nil
 	},
@@ -43,9 +43,9 @@ var responsesChatCommand = &cobra.Command{
 	Use:   "chat",
 	Short: "Chat with the OpenAI Responses API",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		client := responses.NewClient(os.Getenv("OPENAI_API_KEY"), http.DefaultClient)
+		client := responses.NewClient(apiKey, http.DefaultClient)
 
-		startResonsesChat(cmd.Context(), client, "gpt-4o")
+		startResponsesChat(cmd.Context(), client, chatModel)
 
 		return nil
 	},
@@ -55,10 +55,10 @@ var responsesGetCommand = &cobra.Command{
 	Use:   "get",
 	Short: "Get a single response",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		client := responses.NewClient(os.Getenv("OPENAI_API_KEY"), http.DefaultClient)
+		client := responses.NewClient(apiKey, http.DefaultClient)
 
 		resp, err := client.Create(cmd.Context(), responses.Request{
-			Model:      "gpt-4o",
+			Model:      chatModel,
 			Input:      responses.Text(strings.Join(args, " ")),
 			ToolChoice: responses.RequestToolChoiceAuto,
 			Tools: responses.RequestTools{
@@ -86,30 +86,30 @@ var responsesDeleteCommand = &cobra.Command{
 	Short: "Delete a single response",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		client := responses.NewClient(os.Getenv("OPENAI_API_KEY"), http.DefaultClient)
+		client := responses.NewClient(apiKey, http.DefaultClient)
 
 		respID := args[0]
 		if err := client.Delete(cmd.Context(), respID); err != nil {
 			return fmt.Errorf("failed to delete response %q: %w", respID, err)
 		}
 
-		cmd.OutOrStdout().Write([]byte(fmt.Sprintf("Deleted response %q\n", respID)))
+		fmt.Fprintf(cmd.OutOrStdout(), "Deleted response %q\n", respID)
 		return nil
 	},
 }
 
-func startResonsesChat(ctx context.Context, client *responses.Client, model string) {
+func startResponsesChat(ctx context.Context, client *responses.Client, model string) error {
 	// Set the terminal to raw mode.
 	fd := int(os.Stdout.Fd())
 	oldState, err := term.MakeRaw(fd)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("failed to set terminal to raw mode: %w", err)
 	}
 	defer term.Restore(0, oldState)
 
 	termWidth, termHeight, err := term.GetSize(fd)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("failed to get terminal size: %w", err)
 	}
 
 	termReadWriter := struct {
@@ -223,7 +223,7 @@ func startResonsesChat(ctx context.Context, client *responses.Client, model stri
 		if err != nil {
 			bt.WriteString(err.Error())
 			bt.Flush()
-			return
+			return fmt.Errorf("failed to read line: %w", err)
 		}
 
 		// Check if the user wants to exit.
@@ -262,7 +262,7 @@ func startResonsesChat(ctx context.Context, client *responses.Client, model stri
 					if err := client.Delete(ctx, respID); err != nil {
 						bt.WriteString(respID + ":" + err.Error() + "\n")
 						bt.Flush()
-						return
+						return fmt.Errorf("failed to delete response %q: %w", respID, err)
 					}
 
 					if prevRespID == respID {
@@ -271,7 +271,7 @@ func startResonsesChat(ctx context.Context, client *responses.Client, model stri
 
 					deletedN++
 				}
-				bt.WriteString(fmt.Sprintf("Deleted %d responses.\n", deletedN))
+				fmt.Fprintf(bt, "Deleted %d responses.\n", deletedN)
 				bt.Flush()
 				continue
 			}
@@ -289,7 +289,7 @@ func startResonsesChat(ctx context.Context, client *responses.Client, model stri
 		if err != nil {
 			bt.WriteString(err.Error())
 			bt.Flush()
-			return
+			return fmt.Errorf("failed to create response: %w", err)
 		}
 
 		for _, output := range resp.Output {
@@ -305,7 +305,7 @@ func startResonsesChat(ctx context.Context, client *responses.Client, model stri
 			if err != nil {
 				bt.WriteString(err.Error())
 				bt.Flush()
-				return
+				return fmt.Errorf("failed to render markdown: %w", err)
 			}
 
 			bt.WriteString(s)
@@ -314,4 +314,11 @@ func startResonsesChat(ctx context.Context, client *responses.Client, model stri
 		allRespIDs = append(allRespIDs, resp.ID)
 		prevRespID = resp.ID
 	}
+
+	// Flush the buffer to the terminal.
+	if err := bt.Flush(); err != nil {
+		return fmt.Errorf("failed to flush buffer: %w", err)
+	}
+
+	return nil
 }
