@@ -395,7 +395,11 @@ func addURLsToInput(ctx context.Context, input string) (string, error) {
 			if strings.HasPrefix(url, "http://") {
 				url = strings.Replace(url, "http://", "https://", 1)
 			}
-			resp, err := http.Get(url)
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+			if err != nil {
+				return input, fmt.Errorf("failed to create request for URL %q: %w", url, err)
+			}
+			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
 				return input, fmt.Errorf("failed to fetch URL %q: %w", url, err)
 			}
