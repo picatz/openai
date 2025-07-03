@@ -399,7 +399,7 @@ func addURLsToInput(input string) (string, error) {
 			}
 			defer resp.Body.Close()
 
-			if resp.StatusCode/100 != 2 {
+			if resp.StatusCode != http.StatusOK {
 				io.Copy(io.Discard, resp.Body)
 				return input, fmt.Errorf("failed to fetch URL %q: %s", url, resp.Status)
 			}
