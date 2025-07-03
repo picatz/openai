@@ -365,6 +365,10 @@ func startResponsesChat(ctx context.Context, client *responses.Client, model str
 	return nil
 }
 
+// addFilesToInput looks for "#file:" tokens in the provided input and
+// replaces them with the referenced file's contents. The modified input is
+// returned. If a file cannot be opened the original input and an error are
+// returned.
 func addFilesToInput(input string) (string, error) {
 	fields := strings.Fields(input)
 	for _, field := range fields {
@@ -380,6 +384,10 @@ func addFilesToInput(input string) (string, error) {
 	return input, nil
 }
 
+// addURLsToInput looks for "#url:" tokens in the provided input, fetches the
+// contents of the referenced URLs, and replaces the tokens with the fetched
+// data. The modified input is returned. If a URL cannot be fetched the
+// original input and an error are returned.
 func addURLsToInput(input string) (string, error) {
 	fields := strings.Fields(input)
 	for _, field := range fields {
