@@ -141,6 +141,13 @@ func startResponsesChat(ctx context.Context, client *responses.Client, model str
 
 	cls()
 
+	// Track file path completions so repeated tab presses cycle through matches.
+	var fileComplete struct {
+		prefix  string
+		matches []string
+		index   int
+	}
+
 	// Autocomplete for commands and special tokens.
 	t.AutoCompleteCallback = func(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
 		if key != '\t' {
@@ -171,9 +178,15 @@ func startResponsesChat(ctx context.Context, client *responses.Client, model str
 
 		if strings.HasPrefix(last, "#file:") {
 			prefix := strings.TrimPrefix(last, "#file:")
-			matches, _ := filepath.Glob(prefix + "*")
-			if len(matches) > 0 {
-				parts[len(parts)-1] = "#file:" + matches[0]
+			if prefix != fileComplete.prefix {
+				fileComplete.prefix = prefix
+				fileComplete.index = 0
+				fileComplete.matches, _ = filepath.Glob(prefix + "*")
+			}
+			if len(fileComplete.matches) > 0 {
+				suggestion := "#file:" + fileComplete.matches[fileComplete.index]
+				fileComplete.index = (fileComplete.index + 1) % len(fileComplete.matches)
+				parts[len(parts)-1] = suggestion
 				newLine = strings.Join(parts, " ")
 				return newLine, len(newLine), true
 			}
@@ -477,8 +490,8 @@ func printResponsesChatHelp(bt *bufio.Writer) {
 	bt.WriteString("- " + styleFaint.Render("help") + " to show this help.\n")
 	bt.WriteString("- " + styleFaint.Render("exit") + " to quit.\n\n")
 	bt.WriteString("Use " + styleInfo.Render("<clipboard>") + " to include clipboard content in a message.\n")
-	bt.WriteString("Use " + styleInfo.Render("#file:path") + " to include file content in a message.\n")
-	bt.WriteString("Use " + styleInfo.Render("#url:path") + " to include URL content in a message.\n")
+	bt.WriteString("Use " + styleInfo.Render("#file:") + stylePath.Render("path") + " to include file content in a message.\n")
+	bt.WriteString("Use " + styleInfo.Render("#url:") + stylePath.Render("path") + " to include URL content in a message.\n")
 	bt.WriteString("\n")
 	bt.Flush()
 }
