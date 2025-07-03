@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -140,16 +141,51 @@ func startResponsesChat(ctx context.Context, client *responses.Client, model str
 
 	cls()
 
-	// Autocomplete for commands.
+	// Autocomplete for commands and special tokens.
 	t.AutoCompleteCallback = func(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
-		// If the user presses tab, then autocomplete the command.
-		if key == '\t' {
-			for _, cmd := range []string{"exit", "clear", "delete", "copy", "tokens", "help"} {
-				if strings.HasPrefix(cmd, line) {
-					return cmd, len(cmd), true
-				}
+		if key != '\t' {
+			return line, pos, false
+		}
+
+		for _, cmd := range []string{"exit", "clear", "delete", "copy", "tokens", "help"} {
+			if strings.HasPrefix(cmd, line) {
+				return cmd, len(cmd), true
 			}
 		}
+
+		// Autocomplete the last "word" if it looks like a special token.
+		parts := strings.Fields(line)
+		if len(parts) == 0 {
+			return line, pos, false
+		}
+		last := parts[len(parts)-1]
+
+		if strings.HasPrefix(last, "<clip") {
+			token := "<clipboard>"
+			if strings.HasPrefix(token, last) {
+				parts[len(parts)-1] = token
+				newLine = strings.Join(parts, " ")
+				return newLine, len(newLine), true
+			}
+		}
+
+		if strings.HasPrefix(last, "#file:") {
+			prefix := strings.TrimPrefix(last, "#file:")
+			matches, _ := filepath.Glob(prefix + "*")
+			if len(matches) > 0 {
+				parts[len(parts)-1] = "#file:" + matches[0]
+				newLine = strings.Join(parts, " ")
+				return newLine, len(newLine), true
+			}
+		}
+
+		if strings.HasPrefix(last, "#url:") {
+			token := "#url:"
+			if last == token {
+				return line, pos, true
+			}
+		}
+
 		return line, pos, false
 	}
 
@@ -440,8 +476,9 @@ func printResponsesChatHelp(bt *bufio.Writer) {
 	bt.WriteString("- " + styleFaint.Render("tokens") + " to show token usage.\n")
 	bt.WriteString("- " + styleFaint.Render("help") + " to show this help.\n")
 	bt.WriteString("- " + styleFaint.Render("exit") + " to quit.\n\n")
-	bt.WriteString("Use '<clipboard>' to include clipboard content in a message.\n")
-	bt.WriteString("Use '#file:path' to include file content in a message.\n")
-	bt.WriteString("Use '#url:path' to include URL content in a message.\n")
+	bt.WriteString("Use " + styleInfo.Render("<clipboard>") + " to include clipboard content in a message.\n")
+	bt.WriteString("Use " + styleInfo.Render("#file:path") + " to include file content in a message.\n")
+	bt.WriteString("Use " + styleInfo.Render("#url:path") + " to include URL content in a message.\n")
+	bt.WriteString("\n")
 	bt.Flush()
 }
