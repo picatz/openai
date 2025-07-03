@@ -289,7 +289,7 @@ func startResponsesChat(ctx context.Context, client *responses.Client, model str
 		// Replace special tokens before sending to the API.
 		processors := []struct {
 			token   string
-			process func(string) (string, error)
+			process func(context.Context, string) (string, error)
 		}{
 			{"#file:", addFilesToInput},
 			{"#url:", addURLsToInput},
@@ -299,7 +299,7 @@ func startResponsesChat(ctx context.Context, client *responses.Client, model str
 		var procErr error
 		for _, p := range processors {
 			if strings.Contains(input, p.token) {
-				input, procErr = p.process(input)
+				input, procErr = p.process(ctx, input)
 				if procErr != nil {
 					bt.WriteString(fmt.Sprintf("Error processing %s: %s\n", p.token, procErr))
 					bt.Flush()
@@ -363,7 +363,8 @@ func startResponsesChat(ctx context.Context, client *responses.Client, model str
 // replaces them with the referenced file's contents. The modified input is
 // returned. If a file cannot be opened the original input and an error are
 // returned.
-func addFilesToInput(input string) (string, error) {
+// The command's context is passed so file reading can be canceled if needed.
+func addFilesToInput(ctx context.Context, input string) (string, error) {
 	fields := strings.Fields(input)
 	for _, field := range fields {
 		if strings.HasPrefix(field, "#file:") {
@@ -382,7 +383,8 @@ func addFilesToInput(input string) (string, error) {
 // contents of the referenced URLs, and replaces the tokens with the fetched
 // data. The modified input is returned. If a URL cannot be fetched the
 // original input and an error are returned.
-func addURLsToInput(input string) (string, error) {
+// A context parameter allows request cancellation.
+func addURLsToInput(ctx context.Context, input string) (string, error) {
 	fields := strings.Fields(input)
 	for _, field := range fields {
 		if strings.HasPrefix(field, "#url:") {
@@ -398,8 +400,7 @@ func addURLsToInput(input string) (string, error) {
 				return input, fmt.Errorf("failed to fetch URL %q: %w", url, err)
 			}
 			defer resp.Body.Close()
-
-			if resp.StatusCode != http.StatusOK {
+			if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 				io.Copy(io.Discard, resp.Body)
 				return input, fmt.Errorf("failed to fetch URL %q: %s", url, resp.Status)
 			}
@@ -415,8 +416,9 @@ func addURLsToInput(input string) (string, error) {
 }
 
 // addClipboardToInput looks for the "<clipboard>" token in the provided input
-// and replaces it with the system clipboard contents.
-func addClipboardToInput(input string) (string, error) {
+// and replaces it with the system clipboard contents. The context can be used
+// to abort clipboard operations.
+func addClipboardToInput(ctx context.Context, input string) (string, error) {
 	clip, err := readClipboard()
 	if err != nil {
 		return input, err
