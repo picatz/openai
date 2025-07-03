@@ -144,23 +144,12 @@ func startResponsesChat(ctx context.Context, client *responses.Client, model str
 	t.AutoCompleteCallback = func(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
 		// If the user presses tab, then autocomplete the command.
 		if key == '\t' {
-			for _, cmd := range []string{"exit", "clear", "delete"} {
+			for _, cmd := range []string{"exit", "clear", "delete", "copy", "tokens", "help"} {
 				if strings.HasPrefix(cmd, line) {
-					// Autocomplete the command.
-					// t.Write([]byte(cmd[len(line):]))
-
-					// Return the new line and position, which must come after the
-					// command.
 					return cmd, len(cmd), true
 				}
 			}
 		}
-
-		// If the user hit backspace on the example system message, then we'll
-		// just delete the whole line, re-add the "system:" prefix, and return
-		// the new line and position.
-
-		// Otherwise, we'll just return the line.
 		return line, pos, false
 	}
 
@@ -169,11 +158,7 @@ func startResponsesChat(ctx context.Context, client *responses.Client, model str
 	bt.WriteString("\n\n")
 	bt.WriteString(styleWarning.Render("WARNING") + styleFaint.Render(": All responses are stored and deleted after exiting.\n\n"))
 	bt.WriteString("\033[0G")
-	bt.WriteString(styleBold.Render("Commands") + " " + styleFaint.Render("(tab complete)") + "\n\n")
-	bt.WriteString("- " + styleFaint.Render("clear") + " to clear screen.\n")
-	bt.WriteString("- " + styleFaint.Render("delete") + " to delete previous response (up to given number).\n")
-	bt.WriteString("- " + styleFaint.Render("exit") + " to quit.\n\n")
-	bt.Flush()
+	printResponsesChatHelp(bt)
 
 	var allRespIDs []string
 	defer func() {
@@ -206,7 +191,11 @@ func startResponsesChat(ctx context.Context, client *responses.Client, model str
 		bt.Flush()
 	}()
 
-	var prevRespID string
+	var (
+		prevRespID  string
+		lastMessage string
+		totalTokens int
+	)
 
 	for {
 		// Move to left edge.
@@ -235,6 +224,26 @@ func startResponsesChat(ctx context.Context, client *responses.Client, model str
 		if strings.TrimSpace(input) == "clear" {
 			// Clear the screen.
 			cls()
+			continue
+		}
+
+		if strings.TrimSpace(input) == "help" {
+			cls()
+			printResponsesChatHelp(bt)
+			continue
+		}
+
+		if strings.TrimSpace(input) == "tokens" {
+			bt.WriteString(fmt.Sprintf("Tokens used: %d\n", totalTokens))
+			bt.Flush()
+			continue
+		}
+
+		if strings.TrimSpace(input) == "copy" {
+			if err := writeClipboard(lastMessage); err != nil {
+				bt.WriteString("Clipboard error: " + err.Error() + "\n")
+			}
+			bt.Flush()
 			continue
 		}
 
@@ -277,6 +286,37 @@ func startResponsesChat(ctx context.Context, client *responses.Client, model str
 			}
 		}
 
+		// Replace special tokens before sending to the API.
+		if strings.Contains(input, "#file:") {
+			var err error
+			input, err = addFilesToInput(input)
+			if err != nil {
+				bt.WriteString("Error adding files: " + err.Error() + "\n")
+				bt.Flush()
+				continue
+			}
+		}
+
+		if strings.Contains(input, "#url:") {
+			var err error
+			input, err = addURLsToInput(input)
+			if err != nil {
+				bt.WriteString("Error adding URLs: " + err.Error() + "\n")
+				bt.Flush()
+				continue
+			}
+		}
+
+		if strings.Contains(input, "<clipboard>") {
+			clip, err := readClipboard()
+			if err == nil {
+				input = strings.ReplaceAll(input, "<clipboard>", clip)
+			} else {
+				bt.WriteString("Clipboard read error: " + err.Error() + "\n")
+				bt.Flush()
+			}
+		}
+
 		resp, err := client.Create(ctx, responses.Request{
 			Model:              model,
 			PreviousResponseID: prevRespID,
@@ -313,6 +353,8 @@ func startResponsesChat(ctx context.Context, client *responses.Client, model str
 
 		allRespIDs = append(allRespIDs, resp.ID)
 		prevRespID = resp.ID
+		lastMessage = strings.TrimRight(resp.Output[0].Content[0].Text, "\n")
+		totalTokens += resp.Usage.TotalTokens
 	}
 
 	// Flush the buffer to the terminal.
@@ -321,4 +363,61 @@ func startResponsesChat(ctx context.Context, client *responses.Client, model str
 	}
 
 	return nil
+}
+
+func addFilesToInput(input string) (string, error) {
+	fields := strings.Fields(input)
+	for _, field := range fields {
+		if strings.HasPrefix(field, "#file:") {
+			filePath := strings.TrimPrefix(field, "#file:")
+			data, err := os.ReadFile(filePath)
+			if err != nil {
+				return input, fmt.Errorf("failed to open file %q: %w", filePath, err)
+			}
+			input = strings.Replace(input, field, string(data), 1)
+		}
+	}
+	return input, nil
+}
+
+func addURLsToInput(input string) (string, error) {
+	fields := strings.Fields(input)
+	for _, field := range fields {
+		if strings.HasPrefix(field, "#url:") {
+			url := strings.TrimPrefix(field, "#url:")
+			if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+				url = "https://" + url
+			}
+			if strings.HasPrefix(url, "http://") {
+				url = strings.Replace(url, "http://", "https://", 1)
+			}
+			resp, err := http.Get(url)
+			if err != nil {
+				return input, fmt.Errorf("failed to fetch URL %q: %w", url, err)
+			}
+			body, err := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			if err != nil {
+				return input, fmt.Errorf("error reading response body from URL %q: %w", url, err)
+			}
+			input = strings.Replace(input, field, string(body), 1)
+		}
+	}
+	return input, nil
+}
+
+// printResponsesChatHelp prints available commands and token usage instructions
+// to the provided buffer.
+func printResponsesChatHelp(bt *bufio.Writer) {
+	bt.WriteString(styleBold.Render("Commands") + " " + styleFaint.Render("(tab complete)") + "\n\n")
+	bt.WriteString("- " + styleFaint.Render("clear") + " to clear screen.\n")
+	bt.WriteString("- " + styleFaint.Render("delete") + " to delete previous response (up to given number).\n")
+	bt.WriteString("- " + styleFaint.Render("copy") + " to copy last response to the clipboard.\n")
+	bt.WriteString("- " + styleFaint.Render("tokens") + " to show token usage.\n")
+	bt.WriteString("- " + styleFaint.Render("help") + " to show this help.\n")
+	bt.WriteString("- " + styleFaint.Render("exit") + " to quit.\n\n")
+	bt.WriteString("Use '<clipboard>' to include clipboard content in a message.\n")
+	bt.WriteString("Use '#file:path' to include file content in a message.\n")
+	bt.WriteString("Use '#url:path' to include URL content in a message.\n")
+	bt.Flush()
 }
