@@ -7,12 +7,18 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/picatz/openai/internal/responses"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
+)
+
+const (
+	keyAltLeft  = 0xd800 + 5
+	keyAltRight = 0xd800 + 6
 )
 
 func init() {
@@ -140,27 +146,76 @@ func startResponsesChat(ctx context.Context, client *responses.Client, model str
 
 	cls()
 
-	// Autocomplete for commands.
-	t.AutoCompleteCallback = func(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
-		// If the user presses tab, then autocomplete the command.
-		if key == '\t' {
-			for _, cmd := range []string{"exit", "clear", "delete"} {
-				if strings.HasPrefix(cmd, line) {
-					// Autocomplete the command.
-					// t.Write([]byte(cmd[len(line):]))
+	// Track file path completions so repeated tab presses cycle through
+	// matches. We allow cycling forward with <Tab> or Alt+Right and cycling
+	// backward with Alt+Left.
+	var fileComplete struct {
+		prefix  string
+		matches []string
+		index   int
+	}
 
-					// Return the new line and position, which must come after the
-					// command.
-					return cmd, len(cmd), true
-				}
+	// Autocomplete for commands and special tokens. Tab and Alt+Right cycle
+	// forward while Alt+Left cycles backward through file path matches.
+	t.AutoCompleteCallback = func(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
+		switch key {
+		case '\t', keyAltRight, keyAltLeft:
+		default:
+			return line, pos, false
+		}
+
+		for _, cmd := range []string{"exit", "clear", "delete", "copy", "tokens", "help"} {
+			if strings.HasPrefix(cmd, line) {
+				return cmd, len(cmd), true
 			}
 		}
 
-		// If the user hit backspace on the example system message, then we'll
-		// just delete the whole line, re-add the "system:" prefix, and return
-		// the new line and position.
+		// Autocomplete the last "word" if it looks like a special token.
+		parts := strings.Fields(line)
+		if len(parts) == 0 {
+			return line, pos, false
+		}
+		last := parts[len(parts)-1]
 
-		// Otherwise, we'll just return the line.
+		if strings.HasPrefix(last, "<clip") {
+			token := "<clipboard>"
+			if strings.HasPrefix(token, last) {
+				parts[len(parts)-1] = token
+				newLine = strings.Join(parts, " ")
+				return newLine, len(newLine), true
+			}
+		}
+
+		if strings.HasPrefix(last, "#file:") {
+			prefix := strings.TrimPrefix(last, "#file:")
+			if prefix != fileComplete.prefix {
+				fileComplete.prefix = prefix
+				fileComplete.index = 0
+				fileComplete.matches, _ = filepath.Glob(prefix + "*")
+			}
+			if len(fileComplete.matches) > 0 {
+				if key == keyAltLeft {
+					fileComplete.index--
+					if fileComplete.index < 0 {
+						fileComplete.index = len(fileComplete.matches) - 1
+					}
+				} else {
+					fileComplete.index = (fileComplete.index + 1) % len(fileComplete.matches)
+				}
+				suggestion := "#file:" + fileComplete.matches[fileComplete.index]
+				parts[len(parts)-1] = suggestion
+				newLine = strings.Join(parts, " ")
+				return newLine, len(newLine), true
+			}
+		}
+
+		if strings.HasPrefix(last, "#url:") {
+			token := "#url:"
+			if last == token {
+				return line, pos, true
+			}
+		}
+
 		return line, pos, false
 	}
 
@@ -169,11 +224,7 @@ func startResponsesChat(ctx context.Context, client *responses.Client, model str
 	bt.WriteString("\n\n")
 	bt.WriteString(styleWarning.Render("WARNING") + styleFaint.Render(": All responses are stored and deleted after exiting.\n\n"))
 	bt.WriteString("\033[0G")
-	bt.WriteString(styleBold.Render("Commands") + " " + styleFaint.Render("(tab complete)") + "\n\n")
-	bt.WriteString("- " + styleFaint.Render("clear") + " to clear screen.\n")
-	bt.WriteString("- " + styleFaint.Render("delete") + " to delete previous response (up to given number).\n")
-	bt.WriteString("- " + styleFaint.Render("exit") + " to quit.\n\n")
-	bt.Flush()
+	printResponsesChatHelp(bt)
 
 	var allRespIDs []string
 	defer func() {
@@ -206,7 +257,11 @@ func startResponsesChat(ctx context.Context, client *responses.Client, model str
 		bt.Flush()
 	}()
 
-	var prevRespID string
+	var (
+		prevRespID  string
+		lastMessage string
+		totalTokens int
+	)
 
 	for {
 		// Move to left edge.
@@ -235,6 +290,26 @@ func startResponsesChat(ctx context.Context, client *responses.Client, model str
 		if strings.TrimSpace(input) == "clear" {
 			// Clear the screen.
 			cls()
+			continue
+		}
+
+		if strings.TrimSpace(input) == "help" {
+			cls()
+			printResponsesChatHelp(bt)
+			continue
+		}
+
+		if strings.TrimSpace(input) == "tokens" {
+			bt.WriteString(fmt.Sprintf("Tokens used: %d\n", totalTokens))
+			bt.Flush()
+			continue
+		}
+
+		if strings.TrimSpace(input) == "copy" {
+			if err := writeClipboard(lastMessage); err != nil {
+				bt.WriteString("Clipboard error: " + err.Error() + "\n")
+			}
+			bt.Flush()
 			continue
 		}
 
@@ -277,6 +352,31 @@ func startResponsesChat(ctx context.Context, client *responses.Client, model str
 			}
 		}
 
+		// Replace special tokens before sending to the API.
+		processors := []struct {
+			token   string
+			process func(context.Context, string) (string, error)
+		}{
+			{"#file:", addFilesToInput},
+			{"#url:", addURLsToInput},
+			{"<clipboard>", addClipboardToInput},
+		}
+
+		var procErr error
+		for _, p := range processors {
+			if strings.Contains(input, p.token) {
+				input, procErr = p.process(ctx, input)
+				if procErr != nil {
+					bt.WriteString(fmt.Sprintf("Error processing %s: %s\n", p.token, procErr))
+					bt.Flush()
+					break
+				}
+			}
+		}
+		if procErr != nil {
+			continue
+		}
+
 		resp, err := client.Create(ctx, responses.Request{
 			Model:              model,
 			PreviousResponseID: prevRespID,
@@ -313,6 +413,8 @@ func startResponsesChat(ctx context.Context, client *responses.Client, model str
 
 		allRespIDs = append(allRespIDs, resp.ID)
 		prevRespID = resp.ID
+		lastMessage = strings.TrimRight(resp.Output[0].Content[0].Text, "\n")
+		totalTokens += resp.Usage.TotalTokens
 	}
 
 	// Flush the buffer to the terminal.
@@ -321,4 +423,93 @@ func startResponsesChat(ctx context.Context, client *responses.Client, model str
 	}
 
 	return nil
+}
+
+// addFilesToInput looks for "#file:" tokens in the provided input and
+// replaces them with the referenced file's contents. The modified input is
+// returned. If a file cannot be opened the original input and an error are
+// returned.
+// The command's context is passed so file reading can be canceled if needed.
+func addFilesToInput(ctx context.Context, input string) (string, error) {
+	fields := strings.Fields(input)
+	for _, field := range fields {
+		if strings.HasPrefix(field, "#file:") {
+			filePath := strings.TrimPrefix(field, "#file:")
+			data, err := os.ReadFile(filePath)
+			if err != nil {
+				return input, fmt.Errorf("failed to open file %q: %w", filePath, err)
+			}
+			input = strings.Replace(input, field, string(data), 1)
+		}
+	}
+	return input, nil
+}
+
+// addURLsToInput looks for "#url:" tokens in the provided input, fetches the
+// contents of the referenced URLs, and replaces the tokens with the fetched
+// data. The modified input is returned. If a URL cannot be fetched the
+// original input and an error are returned.
+// A context parameter allows request cancellation.
+func addURLsToInput(ctx context.Context, input string) (string, error) {
+	fields := strings.Fields(input)
+	for _, field := range fields {
+		if strings.HasPrefix(field, "#url:") {
+			url := strings.TrimPrefix(field, "#url:")
+			if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+				url = "https://" + url
+			}
+			if strings.HasPrefix(url, "http://") {
+				url = strings.Replace(url, "http://", "https://", 1)
+			}
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+			if err != nil {
+				return input, fmt.Errorf("failed to create request for URL %q: %w", url, err)
+			}
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				return input, fmt.Errorf("failed to fetch URL %q: %w", url, err)
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+				io.Copy(io.Discard, resp.Body)
+				return input, fmt.Errorf("failed to fetch URL %q: %s", url, resp.Status)
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return input, fmt.Errorf("error reading response body from URL %q: %w", url, err)
+			}
+			input = strings.Replace(input, field, string(body), 1)
+		}
+	}
+	return input, nil
+}
+
+// addClipboardToInput looks for the "<clipboard>" token in the provided input
+// and replaces it with the system clipboard contents. The context can be used
+// to abort clipboard operations.
+func addClipboardToInput(ctx context.Context, input string) (string, error) {
+	clip, err := readClipboard()
+	if err != nil {
+		return input, err
+	}
+	return strings.ReplaceAll(input, "<clipboard>", clip), nil
+}
+
+// printResponsesChatHelp prints available commands and token usage instructions
+// to the provided buffer.
+func printResponsesChatHelp(bt *bufio.Writer) {
+	bt.WriteString(styleBold.Render("Commands") + " " + styleFaint.Render("(tab complete)") + "\n\n")
+	bt.WriteString("- " + styleFaint.Render("clear") + " to clear screen.\n")
+	bt.WriteString("- " + styleFaint.Render("delete") + " to delete previous response (up to given number).\n")
+	bt.WriteString("- " + styleFaint.Render("copy") + " to copy last response to the clipboard.\n")
+	bt.WriteString("- " + styleFaint.Render("tokens") + " to show token usage.\n")
+	bt.WriteString("- " + styleFaint.Render("help") + " to show this help.\n")
+	bt.WriteString("- " + styleFaint.Render("exit") + " to quit.\n\n")
+	bt.WriteString("Use " + styleInfo.Render("<clipboard>") + " to include clipboard content in a message.\n")
+	bt.WriteString("Use " + styleInfo.Render("#file:") + stylePath.Render("path") + " to include file content in a message.\n")
+	bt.WriteString("Use \t to cycle file paths forward and \u2190/\u2192 (Alt+Left/Right) to cycle backward or forward.\n")
+	bt.WriteString("Use " + styleInfo.Render("#url:") + stylePath.Render("path") + " to include URL content in a message.\n")
+	bt.WriteString("\n")
+	bt.Flush()
 }
