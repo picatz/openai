@@ -16,6 +16,11 @@ import (
 	"golang.org/x/term"
 )
 
+const (
+	keyAltLeft  = 0xd800 + 5
+	keyAltRight = 0xd800 + 6
+)
+
 func init() {
 	responsesCommand.AddCommand(
 		responsesChatCommand,
@@ -141,16 +146,21 @@ func startResponsesChat(ctx context.Context, client *responses.Client, model str
 
 	cls()
 
-	// Track file path completions so repeated tab presses cycle through matches.
+	// Track file path completions so repeated tab presses cycle through
+	// matches. We allow cycling forward with <Tab> or Alt+Right and cycling
+	// backward with Alt+Left.
 	var fileComplete struct {
 		prefix  string
 		matches []string
 		index   int
 	}
 
-	// Autocomplete for commands and special tokens.
+	// Autocomplete for commands and special tokens. Tab and Alt+Right cycle
+	// forward while Alt+Left cycles backward through file path matches.
 	t.AutoCompleteCallback = func(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
-		if key != '\t' {
+		switch key {
+		case '\t', keyAltRight, keyAltLeft:
+		default:
 			return line, pos, false
 		}
 
@@ -184,8 +194,15 @@ func startResponsesChat(ctx context.Context, client *responses.Client, model str
 				fileComplete.matches, _ = filepath.Glob(prefix + "*")
 			}
 			if len(fileComplete.matches) > 0 {
+				if key == keyAltLeft {
+					fileComplete.index--
+					if fileComplete.index < 0 {
+						fileComplete.index = len(fileComplete.matches) - 1
+					}
+				} else {
+					fileComplete.index = (fileComplete.index + 1) % len(fileComplete.matches)
+				}
 				suggestion := "#file:" + fileComplete.matches[fileComplete.index]
-				fileComplete.index = (fileComplete.index + 1) % len(fileComplete.matches)
 				parts[len(parts)-1] = suggestion
 				newLine = strings.Join(parts, " ")
 				return newLine, len(newLine), true
@@ -491,6 +508,7 @@ func printResponsesChatHelp(bt *bufio.Writer) {
 	bt.WriteString("- " + styleFaint.Render("exit") + " to quit.\n\n")
 	bt.WriteString("Use " + styleInfo.Render("<clipboard>") + " to include clipboard content in a message.\n")
 	bt.WriteString("Use " + styleInfo.Render("#file:") + stylePath.Render("path") + " to include file content in a message.\n")
+	bt.WriteString("Use \t to cycle file paths forward and \u2190/\u2192 (Alt+Left/Right) to cycle backward or forward.\n")
 	bt.WriteString("Use " + styleInfo.Render("#url:") + stylePath.Render("path") + " to include URL content in a message.\n")
 	bt.WriteString("\n")
 	bt.Flush()
