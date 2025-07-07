@@ -10,4 +10,5 @@ var (
 	styleInfo    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#57C7FF")) // Blue
 	styleSuccess = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#5AFFA"))  // Green
 	styleError   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FF5A5F")) // Red
+	stylePath    = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD75F"))
 )
