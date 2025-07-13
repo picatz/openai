@@ -33,10 +33,23 @@ func init() {
 	)
 }
 
+func getAPIKeyEnvVariable() (string, error) {
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	if apiKey == "" {
+		return "", fmt.Errorf("OPENAI_API_KEY environment variable is not set")
+	}
+	return apiKey, nil
+}
+
 var responsesCommand = &cobra.Command{
 	Use:   "responses",
 	Short: "Manage the OpenAI Responses API",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		apiKey, err := getAPIKeyEnvVariable()
+		if err != nil {
+			return fmt.Errorf("failed to get API key: %w", err)
+		}
+
 		client := responses.NewClient(apiKey, http.DefaultClient)
 
 		startResponsesChat(cmd.Context(), client, chatModel)
@@ -49,6 +62,11 @@ var responsesChatCommand = &cobra.Command{
 	Use:   "chat",
 	Short: "Chat with the OpenAI Responses API",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		apiKey, err := getAPIKeyEnvVariable()
+		if err != nil {
+			return fmt.Errorf("failed to get API key: %w", err)
+		}
+
 		client := responses.NewClient(apiKey, http.DefaultClient)
 
 		startResponsesChat(cmd.Context(), client, chatModel)
@@ -61,6 +79,11 @@ var responsesGetCommand = &cobra.Command{
 	Use:   "get",
 	Short: "Get a single response",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		apiKey, err := getAPIKeyEnvVariable()
+		if err != nil {
+			return fmt.Errorf("failed to get API key: %w", err)
+		}
+
 		client := responses.NewClient(apiKey, http.DefaultClient)
 
 		resp, err := client.Create(cmd.Context(), responses.Request{
@@ -92,6 +115,11 @@ var responsesDeleteCommand = &cobra.Command{
 	Short: "Delete a single response",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		apiKey, err := getAPIKeyEnvVariable()
+		if err != nil {
+			return fmt.Errorf("failed to get API key: %w", err)
+		}
+
 		client := responses.NewClient(apiKey, http.DefaultClient)
 
 		respID := args[0]
