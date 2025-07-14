@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/charmbracelet/fang"
 	"github.com/openai/openai-go"
 )
 
@@ -24,10 +25,11 @@ func init() {
 }
 
 func main() {
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
 	defer cancel()
 
-	if err := rootCmd.ExecuteContext(ctx); err != nil {
+	err := fang.Execute(ctx, rootCmd)
+	if err != nil {
 		os.Exit(1)
 	}
 }
