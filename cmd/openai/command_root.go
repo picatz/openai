@@ -4,7 +4,8 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/picatz/openai/internal/responses"
+	"github.com/openai/openai-go"
+	"github.com/openai/openai-go/option"
 	"github.com/spf13/cobra"
 )
 
@@ -12,7 +13,10 @@ var rootCmd = &cobra.Command{
 	Use:   "openai",
 	Short: "OpenAI CLI",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		client := responses.NewClient(os.Getenv("OPENAI_API_KEY"), http.DefaultClient)
-		return startResponsesChat(cmd.Context(), client, chatModel)
+		c := openai.NewClient(
+			option.WithAPIKey(os.Getenv("OPENAI_API_KEY")),
+			option.WithHTTPClient(http.DefaultClient),
+		)
+		return startResponsesChat(cmd.Context(), &c, chatModel)
 	},
 }
