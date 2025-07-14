@@ -12,9 +12,8 @@ import (
 	"strings"
 
 	"github.com/openai/openai-go"
-	"github.com/openai/openai-go/option"
 	"github.com/openai/openai-go/packages/param"
-	openairesponses "github.com/openai/openai-go/responses"
+	"github.com/openai/openai-go/responses"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -36,29 +35,11 @@ func init() {
 	)
 }
 
-func getAPIKeyEnvVariable() (string, error) {
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	if apiKey == "" {
-		return "", fmt.Errorf("OPENAI_API_KEY environment variable is not set")
-	}
-	return apiKey, nil
-}
-
 var responsesCommand = &cobra.Command{
 	Use:   "responses",
 	Short: "Manage the OpenAI Responses API",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		apiKey, err := getAPIKeyEnvVariable()
-		if err != nil {
-			return fmt.Errorf("failed to get API key: %w", err)
-		}
-
-		c := openai.NewClient(
-			option.WithAPIKey(apiKey),
-			option.WithHTTPClient(http.DefaultClient),
-		)
-
-		startResponsesChat(cmd.Context(), &c, chatModel)
+		startResponsesChat(cmd.Context(), client, chatModel)
 
 		return nil
 	},
@@ -68,17 +49,7 @@ var responsesChatCommand = &cobra.Command{
 	Use:   "chat",
 	Short: "Chat with the OpenAI Responses API",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		apiKey, err := getAPIKeyEnvVariable()
-		if err != nil {
-			return fmt.Errorf("failed to get API key: %w", err)
-		}
-
-		c := openai.NewClient(
-			option.WithAPIKey(apiKey),
-			option.WithHTTPClient(http.DefaultClient),
-		)
-
-		startResponsesChat(cmd.Context(), &c, chatModel)
+		startResponsesChat(cmd.Context(), client, chatModel)
 
 		return nil
 	},
@@ -88,28 +59,18 @@ var responsesGetCommand = &cobra.Command{
 	Use:   "get",
 	Short: "Get a single response",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		apiKey, err := getAPIKeyEnvVariable()
-		if err != nil {
-			return fmt.Errorf("failed to get API key: %w", err)
-		}
-
-		c := openai.NewClient(
-			option.WithAPIKey(apiKey),
-			option.WithHTTPClient(http.DefaultClient),
-		)
-
-		resp, err := c.Responses.New(cmd.Context(), openairesponses.ResponseNewParams{
-			Model: openairesponses.ResponsesModel(chatModel),
-			Input: openairesponses.ResponseNewParamsInputUnion{
-				OfString: param.NewOpt(strings.Join(args, " ")),
+		resp, err := client.Responses.New(cmd.Context(), responses.ResponseNewParams{
+			Model: responses.ResponsesModel(chatModel),
+			Input: responses.ResponseNewParamsInputUnion{
+				OfString: openai.String(strings.Join(args, " ")),
 			},
-			ToolChoice: openairesponses.ResponseNewParamsToolChoiceUnion{
-				OfToolChoiceMode: param.NewOpt(openairesponses.ToolChoiceOptionsAuto),
+			ToolChoice: responses.ResponseNewParamsToolChoiceUnion{
+				OfToolChoiceMode: openai.Opt(responses.ToolChoiceOptionsAuto),
 			},
-			Tools: []openairesponses.ToolUnionParam{
-				openairesponses.ToolParamOfWebSearchPreview(openairesponses.WebSearchToolTypeWebSearchPreview),
+			Tools: []responses.ToolUnionParam{
+				responses.ToolParamOfWebSearchPreview(responses.WebSearchToolTypeWebSearchPreview),
 			},
-			Store: param.NewOpt(false),
+			Store: openai.Bool(false),
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create response: %w", err)
@@ -126,18 +87,8 @@ var responsesDeleteCommand = &cobra.Command{
 	Short: "Delete a single response",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		apiKey, err := getAPIKeyEnvVariable()
-		if err != nil {
-			return fmt.Errorf("failed to get API key: %w", err)
-		}
-
-		c := openai.NewClient(
-			option.WithAPIKey(apiKey),
-			option.WithHTTPClient(http.DefaultClient),
-		)
-
 		respID := args[0]
-		if err := c.Responses.Delete(cmd.Context(), respID); err != nil {
+		if err := client.Responses.Delete(cmd.Context(), respID); err != nil {
 			return fmt.Errorf("failed to delete response %q: %w", respID, err)
 		}
 
@@ -424,17 +375,17 @@ func startResponsesChat(ctx context.Context, client *openai.Client, model string
 			prevID = param.NewOpt(prevRespID)
 		}
 
-		resp, err := client.Responses.New(ctx, openairesponses.ResponseNewParams{
-			Model:              openairesponses.ResponsesModel(model),
+		resp, err := client.Responses.New(ctx, responses.ResponseNewParams{
+			Model:              responses.ResponsesModel(model),
 			PreviousResponseID: prevID,
-			Input: openairesponses.ResponseNewParamsInputUnion{
-				OfString: param.NewOpt(input),
+			Input: responses.ResponseNewParamsInputUnion{
+				OfString: openai.String(input),
 			},
-			ToolChoice: openairesponses.ResponseNewParamsToolChoiceUnion{
-				OfToolChoiceMode: param.NewOpt(openairesponses.ToolChoiceOptionsAuto),
+			ToolChoice: responses.ResponseNewParamsToolChoiceUnion{
+				OfToolChoiceMode: openai.Opt(responses.ToolChoiceOptionsAuto),
 			},
-			Tools: []openairesponses.ToolUnionParam{
-				openairesponses.ToolParamOfWebSearchPreview(openairesponses.WebSearchToolTypeWebSearchPreview),
+			Tools: []responses.ToolUnionParam{
+				responses.ToolParamOfWebSearchPreview(responses.WebSearchToolTypeWebSearchPreview),
 			},
 		})
 		if err != nil {
