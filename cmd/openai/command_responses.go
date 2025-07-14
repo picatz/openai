@@ -11,7 +11,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/picatz/openai/internal/responses"
+	"github.com/openai/openai-go"
+	"github.com/openai/openai-go/option"
+	"github.com/openai/openai-go/packages/param"
+	openairesponses "github.com/openai/openai-go/responses"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -50,9 +53,12 @@ var responsesCommand = &cobra.Command{
 			return fmt.Errorf("failed to get API key: %w", err)
 		}
 
-		client := responses.NewClient(apiKey, http.DefaultClient)
+		c := openai.NewClient(
+			option.WithAPIKey(apiKey),
+			option.WithHTTPClient(http.DefaultClient),
+		)
 
-		startResponsesChat(cmd.Context(), client, chatModel)
+		startResponsesChat(cmd.Context(), &c, chatModel)
 
 		return nil
 	},
@@ -67,9 +73,12 @@ var responsesChatCommand = &cobra.Command{
 			return fmt.Errorf("failed to get API key: %w", err)
 		}
 
-		client := responses.NewClient(apiKey, http.DefaultClient)
+		c := openai.NewClient(
+			option.WithAPIKey(apiKey),
+			option.WithHTTPClient(http.DefaultClient),
+		)
 
-		startResponsesChat(cmd.Context(), client, chatModel)
+		startResponsesChat(cmd.Context(), &c, chatModel)
 
 		return nil
 	},
@@ -84,27 +93,29 @@ var responsesGetCommand = &cobra.Command{
 			return fmt.Errorf("failed to get API key: %w", err)
 		}
 
-		client := responses.NewClient(apiKey, http.DefaultClient)
+		c := openai.NewClient(
+			option.WithAPIKey(apiKey),
+			option.WithHTTPClient(http.DefaultClient),
+		)
 
-		resp, err := client.Create(cmd.Context(), responses.Request{
-			Model:      chatModel,
-			Input:      responses.Text(strings.Join(args, " ")),
-			ToolChoice: responses.RequestToolChoiceAuto,
-			Tools: responses.RequestTools{
-				responses.RequestToolWebSearchPreview{},
+		resp, err := c.Responses.New(cmd.Context(), openairesponses.ResponseNewParams{
+			Model: openairesponses.ResponsesModel(chatModel),
+			Input: openairesponses.ResponseNewParamsInputUnion{
+				OfString: param.NewOpt(strings.Join(args, " ")),
 			},
-			Store: false,
+			ToolChoice: openairesponses.ResponseNewParamsToolChoiceUnion{
+				OfToolChoiceMode: param.NewOpt(openairesponses.ToolChoiceOptionsAuto),
+			},
+			Tools: []openairesponses.ToolUnionParam{
+				openairesponses.ToolParamOfWebSearchPreview(openairesponses.WebSearchToolTypeWebSearchPreview),
+			},
+			Store: param.NewOpt(false),
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create response: %w", err)
 		}
 
-		for _, output := range resp.Output {
-			if output.Type != "message" {
-				continue
-			}
-			cmd.OutOrStdout().Write([]byte(output.Content[0].Text + "\n"))
-		}
+		cmd.OutOrStdout().Write([]byte(resp.OutputText() + "\n"))
 
 		return nil
 	},
@@ -120,10 +131,13 @@ var responsesDeleteCommand = &cobra.Command{
 			return fmt.Errorf("failed to get API key: %w", err)
 		}
 
-		client := responses.NewClient(apiKey, http.DefaultClient)
+		c := openai.NewClient(
+			option.WithAPIKey(apiKey),
+			option.WithHTTPClient(http.DefaultClient),
+		)
 
 		respID := args[0]
-		if err := client.Delete(cmd.Context(), respID); err != nil {
+		if err := c.Responses.Delete(cmd.Context(), respID); err != nil {
 			return fmt.Errorf("failed to delete response %q: %w", respID, err)
 		}
 
@@ -132,7 +146,7 @@ var responsesDeleteCommand = &cobra.Command{
 	},
 }
 
-func startResponsesChat(ctx context.Context, client *responses.Client, model string) error {
+func startResponsesChat(ctx context.Context, client *openai.Client, model string) error {
 	// Set the terminal to raw mode.
 	fd := int(os.Stdout.Fd())
 	oldState, err := term.MakeRaw(fd)
@@ -264,7 +278,7 @@ func startResponsesChat(ctx context.Context, client *responses.Client, model str
 		bt.Flush()
 
 		for i, respID := range allRespIDs {
-			if err := client.Delete(ctx, respID); err != nil {
+			if err := client.Responses.Delete(ctx, respID); err != nil {
 				bt.WriteString(respID + ":" + err.Error() + "\n")
 				bt.Flush()
 				return
@@ -362,7 +376,7 @@ func startResponsesChat(ctx context.Context, client *responses.Client, model str
 					respID := allRespIDs[len(allRespIDs)-1]     // Get the last response ID.
 					allRespIDs = allRespIDs[:len(allRespIDs)-1] // Remove it from the list.
 
-					if err := client.Delete(ctx, respID); err != nil {
+					if err := client.Responses.Delete(ctx, respID); err != nil {
 						bt.WriteString(respID + ":" + err.Error() + "\n")
 						bt.Flush()
 						return fmt.Errorf("failed to delete response %q: %w", respID, err)
@@ -405,13 +419,22 @@ func startResponsesChat(ctx context.Context, client *responses.Client, model str
 			continue
 		}
 
-		resp, err := client.Create(ctx, responses.Request{
-			Model:              model,
-			PreviousResponseID: prevRespID,
-			Input:              responses.Text(input),
-			ToolChoice:         responses.RequestToolChoiceAuto,
-			Tools: responses.RequestTools{
-				responses.RequestToolWebSearchPreview{},
+		var prevID param.Opt[string]
+		if prevRespID != "" {
+			prevID = param.NewOpt(prevRespID)
+		}
+
+		resp, err := client.Responses.New(ctx, openairesponses.ResponseNewParams{
+			Model:              openairesponses.ResponsesModel(model),
+			PreviousResponseID: prevID,
+			Input: openairesponses.ResponseNewParamsInputUnion{
+				OfString: param.NewOpt(input),
+			},
+			ToolChoice: openairesponses.ResponseNewParamsToolChoiceUnion{
+				OfToolChoiceMode: param.NewOpt(openairesponses.ToolChoiceOptionsAuto),
+			},
+			Tools: []openairesponses.ToolUnionParam{
+				openairesponses.ToolParamOfWebSearchPreview(openairesponses.WebSearchToolTypeWebSearchPreview),
 			},
 		})
 		if err != nil {
@@ -420,29 +443,20 @@ func startResponsesChat(ctx context.Context, client *responses.Client, model str
 			return fmt.Errorf("failed to create response: %w", err)
 		}
 
-		for _, output := range resp.Output {
-			if output.Type != "message" {
-				continue
-			}
-
-			// Get 3/4 of the terminal width.
-			threeQuarterWidth := termWidth * 3 / 4
-
-			// Print the output using markdown-friendly terminal rendering.
-			s, err := renderMarkdown(strings.TrimRight(output.Content[0].Text, "\n"), threeQuarterWidth)
-			if err != nil {
-				bt.WriteString(err.Error())
-				bt.Flush()
-				return fmt.Errorf("failed to render markdown: %w", err)
-			}
-
-			bt.WriteString(s)
+		threeQuarterWidth := termWidth * 3 / 4
+		s, err := renderMarkdown(strings.TrimRight(resp.OutputText(), "\n"), threeQuarterWidth)
+		if err != nil {
+			bt.WriteString(err.Error())
+			bt.Flush()
+			return fmt.Errorf("failed to render markdown: %w", err)
 		}
+
+		bt.WriteString(s)
 
 		allRespIDs = append(allRespIDs, resp.ID)
 		prevRespID = resp.ID
-		lastMessage = strings.TrimRight(resp.Output[0].Content[0].Text, "\n")
-		totalTokens += resp.Usage.TotalTokens
+		lastMessage = strings.TrimRight(resp.OutputText(), "\n")
+		totalTokens += int(resp.Usage.TotalTokens)
 	}
 
 	// Flush the buffer to the terminal.
