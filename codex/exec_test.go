@@ -131,22 +131,14 @@ func TestExec_Run(t *testing.T) {
 	}
 	defer thirdStream.Close()
 
-	decoder = json.NewDecoder(thirdStream.Stdout())
-
-	for {
-		var event ThreadEvent
-		if err := decoder.Decode(&event); err != nil {
-			if err == io.EOF {
-				break
-			}
-			t.Fatalf("failed to decode event: %v", err)
+	for event, err := range EventStream(t.Context(), thirdStream) {
+		if err != nil {
+			t.Fatalf("failed to read event: %v", err)
+		}
+		if event == nil {
+			break
 		}
 
 		t.Logf("Received event: %s: %s", threadId, event.String())
-	}
-
-	err = thirdStream.Wait()
-	if err != nil {
-		t.Fatalf("codex execution failed: %v", err)
 	}
 }
