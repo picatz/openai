@@ -14,6 +14,7 @@ import (
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/packages/param"
 	"github.com/openai/openai-go/responses"
+	"github.com/picatz/openai/codex"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -254,6 +255,8 @@ func startResponsesChat(ctx context.Context, client *openai.Client, model string
 		prevRespID  string
 		lastMessage string
 		totalTokens int
+
+		codexThreadID string
 	)
 
 	for {
@@ -343,6 +346,78 @@ func startResponsesChat(ctx context.Context, client *openai.Client, model string
 				bt.Flush()
 				continue
 			}
+		case "@codex":
+			for event, err := range codex.Run(ctx, codex.Args{
+				Input:       strings.Join(fields[1:], " "),
+				Model:       "gpt-5-codex",
+				SandboxMode: codex.SandboxModeReadOnly,
+				ThreadID:    codexThreadID,
+			}) {
+				if err != nil {
+					bt.WriteString("Codex error: " + err.Error() + "\n")
+					bt.Flush()
+					break
+				}
+				if event == nil {
+					break
+				}
+				switch event.Type {
+				case codex.EventTypeThreadStarted:
+					// bt.WriteString("\t" + styleFaint.Render(event.String()) + "\n")
+					// bt.WriteString("\033[0G")
+					// bt.Flush()
+					codexThreadID = event.ThreadID
+				case codex.EventTypeItemCompleted:
+					if item, ok := event.Item.(*codex.AgentMessageItem); ok {
+						s, err := renderMarkdown(strings.TrimRight(item.Text, "\n"), termWidth*3/4)
+						if err != nil {
+							bt.WriteString("Codex render error: " + err.Error() + "\n")
+							bt.Flush()
+							break
+						}
+						bt.WriteString(s)
+						// bt.WriteString("\033[0G")
+						bt.Flush()
+					}
+				case codex.EventTypeTurnCompleted:
+					// if event.Usage != nil {
+					// 	bt.WriteString("\033[0G")
+					// 	bt.WriteString(styleFaint.Render(fmt.Sprintf("\t%s\n", event.String())))
+					// 	bt.WriteString("\033[0G")
+					// 	bt.Flush()
+					// }
+				case codex.EventTypeTurnFailed:
+					if event.Error != nil {
+						bt.WriteString("Codex turn failed: " + event.Error.Message + "\n")
+						bt.Flush()
+						bt.WriteString("\033[0G")
+					}
+				case codex.EventTypeError:
+					bt.WriteString("Codex error: " + event.Message + "\n")
+					bt.WriteString("\033[0G")
+					bt.Flush()
+				case codex.EventTypeItemStarted, codex.EventTypeItemUpdated:
+					// if commandExecItem, ok := event.Item.(*codex.CommandExecutionItem); ok {
+					// 	commandExecMarkdownBlock := "```bash\n" + commandExecItem.Command + "\n```"
+					// 	s, err := renderMarkdown(commandExecMarkdownBlock, termWidth*3/4)
+					// 	if err != nil {
+					// 		bt.WriteString("Codex render error: " + err.Error() + "\n")
+					// 	}
+					// 	bt.WriteString("\t" + s)
+					// 	bt.WriteString("\033[0G")
+					// 	bt.Flush()
+					// } else {
+					// 	bt.WriteString("\t" + styleFaint.Render(event.String()+"\n"))
+					// 	bt.WriteString("\033[0G")
+					// 	bt.Flush()
+					// }
+				default:
+					// bt.WriteString("\t" + styleFaint.Render(event.String()) + "\n")
+					// bt.WriteString("\033[0G")
+					// bt.Flush()
+				}
+			}
+			continue
 		}
 
 		// Replace special tokens before sending to the API.
@@ -424,10 +499,9 @@ func startResponsesChat(ctx context.Context, client *openai.Client, model string
 // returned.
 // The command's context is passed so file reading can be canceled if needed.
 func addFilesToInput(ctx context.Context, input string) (string, error) {
-	fields := strings.Fields(input)
-	for _, field := range fields {
-		if strings.HasPrefix(field, "#file:") {
-			filePath := strings.TrimPrefix(field, "#file:")
+	for field := range strings.FieldsSeq(input) {
+		if after, ok := strings.CutPrefix(field, "#file:"); ok {
+			filePath := after
 			data, err := os.ReadFile(filePath)
 			if err != nil {
 				return input, fmt.Errorf("failed to open file %q: %w", filePath, err)
@@ -444,10 +518,9 @@ func addFilesToInput(ctx context.Context, input string) (string, error) {
 // original input and an error are returned.
 // A context parameter allows request cancellation.
 func addURLsToInput(ctx context.Context, input string) (string, error) {
-	fields := strings.Fields(input)
-	for _, field := range fields {
-		if strings.HasPrefix(field, "#url:") {
-			url := strings.TrimPrefix(field, "#url:")
+	for field := range strings.FieldsSeq(input) {
+		if after, ok := strings.CutPrefix(field, "#url:"); ok {
+			url := after
 			if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
 				url = "https://" + url
 			}
@@ -501,8 +574,9 @@ func printResponsesChatHelp(bt *bufio.Writer) {
 	bt.WriteString("- " + styleFaint.Render("exit") + " to quit.\n\n")
 	bt.WriteString("Use " + styleInfo.Render("<clipboard>") + " to include clipboard content in a message.\n")
 	bt.WriteString("Use " + styleInfo.Render("#file:") + stylePath.Render("path") + " to include file content in a message.\n")
-	bt.WriteString("Use \t to cycle file paths forward and \u2190/\u2192 (Alt+Left/Right) to cycle backward or forward.\n")
+	bt.WriteString("\tUse " + styleKBD.Render("[TAB]") + " to cycle file paths forward and " + styleKBD.Render("\u2190/\u2192") + " (Alt+Left/Right) to cycle backward or forward.\n")
 	bt.WriteString("Use " + styleInfo.Render("#url:") + stylePath.Render("path") + " to include URL content in a message.\n")
+	bt.WriteString("Use " + styleAI.Render("@codex") + " to use Codex for code-related questions.\n")
 	bt.WriteString("\n")
 	bt.Flush()
 }
