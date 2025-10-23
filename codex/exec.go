@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"os"
 	"os/exec"
 	"sort"
@@ -236,4 +237,39 @@ func findCodexPath() (string, error) {
 		return "", fmt.Errorf("find codex binary: %w", err)
 	}
 	return codexPath, nil
+}
+
+// Run executes a codex command with the specified arguments and
+// returns an iterator that yields ThreadEvents from the execution stream.
+//
+// This is a high-level convenience function that combines creating an Exec,
+// running it with the provided arguments, and streaming the resulting events.
+// It handles proper cleanup of the execution stream.
+func Run(ctx context.Context, args Args) iter.Seq2[*ThreadEvent, error] {
+	return func(yield func(*ThreadEvent, error) bool) {
+		exec, err := NewExec("")
+		if err != nil {
+			yield(nil, fmt.Errorf("create codex exec: %w", err))
+			return
+		}
+
+		stream, err := exec.Run(ctx, args)
+		if err != nil {
+			yield(nil, fmt.Errorf("run codex exec: %w", err))
+			return
+		}
+		defer stream.Close()
+
+		for event, err := range EventStream(ctx, stream) {
+			if err != nil {
+				if !yield(nil, fmt.Errorf("read codex event: %w", err)) {
+					return
+				}
+				continue
+			}
+			if !yield(event, nil) {
+				return
+			}
+		}
+	}
 }

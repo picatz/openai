@@ -142,3 +142,20 @@ func TestExec_Run(t *testing.T) {
 		t.Logf("Received event: %s: %s", threadId, event.String())
 	}
 }
+
+func TestRun(t *testing.T) {
+	for event, err := range Run(t.Context(), Args{
+		Input:       "Hello!",
+		Model:       "gpt-5-codex",
+		SandboxMode: SandboxModeReadOnly,
+	}) {
+		if err != nil {
+			t.Fatalf("failed to read event: %v", err)
+		}
+		if event == nil {
+			break
+		}
+
+		t.Logf("Received event: %s", event.String())
+	}
+}
