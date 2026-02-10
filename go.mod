@@ -7,7 +7,7 @@ require (
 	github.com/charmbracelet/glamour v0.10.0
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
 	github.com/cockroachdb/pebble v1.1.5
-	github.com/go-git/go-git/v5 v5.16.3
+	github.com/go-git/go-git/v5 v5.16.5
 	github.com/openai/openai-go v1.12.0
 	github.com/segmentio/ksuid v1.0.4
 	github.com/shoenig/test v1.12.1
