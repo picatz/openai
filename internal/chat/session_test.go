@@ -2,16 +2,15 @@ package chat_test
 
 import (
 	"bytes"
-	"fmt"
-	"math"
+	"github.com/openai/openai-go/v3/option"
+	"io"
+	"net/http"
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/lipgloss/table"
 	"github.com/cockroachdb/pebble"
 	"github.com/cockroachdb/pebble/vfs"
-	"github.com/openai/openai-go"
+	"github.com/openai/openai-go/v3"
 	"github.com/picatz/openai/internal/chat"
 	"github.com/picatz/openai/internal/chat/storage"
 	pebbleStorage "github.com/picatz/openai/internal/chat/storage/pebble"
@@ -20,7 +19,7 @@ import (
 
 func TestChatSession(t *testing.T) {
 	var (
-		client = openai.NewClient()
+		client = openai.NewClient(option.WithAPIKey("test-key"), option.WithBaseURL("https://synthetic.invalid/v1/"), option.WithHTTPClient(&http.Client{Transport: fakeChatTransport{t}}), option.WithMaxRetries(0))
 		input  = bytes.NewBuffer(nil)
 		output = bytes.NewBuffer(nil)
 	)
@@ -78,113 +77,13 @@ func TestChunkString(t *testing.T) {
 	must.Eq(t, expectedChunks, chunks)
 }
 
-func TestChunkString_consign_similarity(t *testing.T) {
-	var (
-		input     = "I like red cats and blue dogs. Red cats are my favorite."
-		chunkSize = int64(6)
-		// chunkSize = int64(5)
-	)
+type fakeChatTransport struct{ t *testing.T }
 
-	chunks, err := chat.ChunkString(input, chunkSize)
-	must.NoError(t, err)
-
-	// expectedChunks := []string{
-	// 	"I like red cats",
-	// 	"and blue dogs.",
-	// 	"Red cats are my",
-	// 	"favorite.",
-	// }
-
-	// must.Eq(t, expectedChunks, chunks)
-
-	client := openai.NewClient()
-
-	type cosinePair struct {
-		A          string
-		B          string
-		Similarity float64
+func (f fakeChatTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	f.t.Helper()
+	if r.URL.Path != "/v1/chat/completions" {
+		f.t.Fatalf("unexpected request: %s", r.URL.Path)
 	}
-
-	getPair := func(a, b string) cosinePair {
-		aEmbedding, err := client.Embeddings.New(t.Context(), openai.EmbeddingNewParams{
-			Model: openai.EmbeddingModelTextEmbedding3Small,
-			Input: openai.EmbeddingNewParamsInputUnion{
-				OfString: openai.String(a),
-			},
-		})
-		must.NoError(t, err)
-
-		bEmbedding, err := client.Embeddings.New(t.Context(), openai.EmbeddingNewParams{
-			Model: openai.EmbeddingModelTextEmbedding3Small,
-			Input: openai.EmbeddingNewParamsInputUnion{
-				OfString: openai.String(b),
-			},
-		})
-		must.NoError(t, err)
-
-		return cosinePair{
-			A: a,
-			B: b,
-			Similarity: cosignSimilarity(
-				aEmbedding.Data[0].Embedding,
-				bEmbedding.Data[0].Embedding,
-			),
-		}
-	}
-
-	var cosinePairs []cosinePair
-
-	for i := range chunks {
-		for j := i + 1; j < len(chunks); j++ {
-			cosinePairs = append(cosinePairs, getPair(chunks[i], chunks[j]))
-		}
-	}
-
-	for i := range chunks {
-		cosinePairs = append(cosinePairs, getPair(chunks[i], chunks[i]))
-	}
-
-	for i := range chunks {
-		cosinePairs = append(cosinePairs, getPair(chunks[i], "Red cats"))
-	}
-
-	for i := range chunks {
-		cosinePairs = append(cosinePairs, getPair("Red cats", chunks[i]))
-	}
-
-	for i := range chunks {
-		cosinePairs = append(cosinePairs, getPair("Blue dogs", chunks[i]))
-	}
-
-	rows := make([][]string, 0, len(cosinePairs))
-	for _, pair := range cosinePairs {
-		rows = append(rows, []string{
-			pair.A + "     ",
-			pair.B + "     ",
-			fmt.Sprintf("%.4f", pair.Similarity),
-		})
-	}
-
-	tbl := table.New().
-		Border(lipgloss.RoundedBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("245"))).
-		Headers("A", "B", "Similarity").
-		Rows(rows...)
-
-	fmt.Println(tbl.Render())
-}
-
-func cosignSimilarity(a, b []float64) float64 {
-	if len(a) != len(b) {
-		return 0.0
-	}
-
-	var dotProduct, normA, normB float64
-	for i := range a {
-		dotProduct += a[i] * b[i]
-		normA += a[i] * a[i]
-		normB += b[i] * b[i]
-	}
-
-	return dotProduct / (math.Sqrt(normA) * math.Sqrt(normB))
+	body := `{"id":"chatcmpl_test","object":"chat.completion","model":"test","choices":[{"index":0,"message":{"role":"assistant","content":"Hello from a fake transport"},"finish_reason":"stop"}],"usage":{"total_tokens":8}}`
+	return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(body)), Request: r}, nil
 }

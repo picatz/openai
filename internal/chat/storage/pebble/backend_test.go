@@ -5,7 +5,7 @@ import (
 
 	"github.com/cockroachdb/pebble"
 	"github.com/cockroachdb/pebble/vfs"
-	"github.com/openai/openai-go"
+	"github.com/openai/openai-go/v3"
 	"github.com/picatz/openai/internal/chat/storage"
 	backendPebble "github.com/picatz/openai/internal/chat/storage/pebble"
 	"github.com/picatz/openai/internal/chat/storage/tests"

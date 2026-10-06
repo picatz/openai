@@ -26,43 +26,40 @@ func (l *stderrLoggerAndTracer) IsTracingEnabled(ctx context.Context) bool {
 	return false
 }
 
-var chatCommand = &cobra.Command{
-	Use:   "chat",
-	Short: "Chat with the OpenAI API",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		codec := &storage.JSONCodec[string, chat.ReqRespPair]{}
+func newChatCommand(app *application) *cobra.Command {
+	chatCommand := &cobra.Command{
+		Use:   "chat",
+		Args:  cobra.NoArgs,
+		Short: "Chat with the OpenAI API",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			codec := &storage.JSONCodec[string, chat.ReqRespPair]{}
 
-		var opts = &pebble.Options{
-			LoggerAndTracer:    &stderrLoggerAndTracer{},
-			FormatMajorVersion: pebble.FormatVirtualSSTables,
-		}
+			var opts = &pebble.Options{
+				LoggerAndTracer:    &stderrLoggerAndTracer{},
+				FormatMajorVersion: pebble.FormatVirtualSSTables,
+			}
 
-		if useTemp, _ := cmd.Flags().GetBool("temporary"); useTemp {
-			opts.FS = vfs.NewMem()
-		}
+			if useTemp, _ := cmd.Flags().GetBool("temporary"); useTemp {
+				opts.FS = vfs.NewMem()
+			}
 
-		storageBackend, err := pebbleStorage.NewBackend(chat.DefaultCachePath, opts, codec)
-		if err != nil {
-			return fmt.Errorf("failed to create pebble backend: %w", err)
-		}
-		defer storageBackend.Close(cmd.Context())
+			storageBackend, err := pebbleStorage.NewBackend(chat.DefaultCachePath, opts, codec)
+			if err != nil {
+				return fmt.Errorf("failed to create pebble backend: %w", err)
+			}
+			defer storageBackend.Close(cmd.Context())
 
-		chatSession, restore, err := chat.NewSession(cmd.Context(), client, chatModel, cmd.InOrStdin(), cmd.OutOrStdout(), storageBackend)
-		if err != nil {
-			return fmt.Errorf("failed to create chat session: %w", err)
-		}
-		defer restore()
+			chatSession, restore, err := chat.NewSession(cmd.Context(), &app.client, app.model, cmd.InOrStdin(), cmd.OutOrStdout(), storageBackend)
+			if err != nil {
+				return fmt.Errorf("failed to create chat session: %w", err)
+			}
+			defer restore()
 
-		chatSession.Run(cmd.Context())
+			return chatSession.Run(cmd.Context())
+		},
+	}
 
-		return nil
-	},
-}
-
-func init() {
 	chatCommand.Flags().BoolP("temporary", "t", false, "Use a temporary in-memory chat storage backend")
 
-	rootCmd.AddCommand(
-		chatCommand,
-	)
+	return chatCommand
 }

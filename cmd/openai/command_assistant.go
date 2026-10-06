@@ -1,18 +1,7 @@
 package main
 
-import (
-	"github.com/spf13/cobra"
-)
+import "github.com/spf13/cobra"
 
-var assistantCommand = &cobra.Command{
-	Use:        "assistant",
-	Deprecated: "use the responses API instead!\n\n\t$ openai responses chat\n",
-}
-
-func init() {
-	assistantCommand.AddCommand()
-
-	rootCmd.AddCommand(
-		assistantCommand,
-	)
+func newAssistantCommand() *cobra.Command {
+	return &cobra.Command{Use: "assistant", Deprecated: "use openai responses chat instead"}
 }

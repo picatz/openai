@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,12 +11,14 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
-	"github.com/openai/openai-go"
-	"github.com/openai/openai-go/packages/param"
-	"github.com/openai/openai-go/responses"
+	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/option"
+	"github.com/openai/openai-go/v3/packages/param"
+	"github.com/openai/openai-go/v3/responses"
 	"github.com/picatz/openai/codex"
-	"github.com/spf13/cobra"
+	"github.com/picatz/openai/internal/terminal"
 	"golang.org/x/term"
 )
 
@@ -24,98 +27,29 @@ const (
 	keyAltRight = 0xd800 + 6
 )
 
-func init() {
-	responsesCommand.AddCommand(
-		responsesChatCommand,
-		responsesGetCommand,
-		responsesDeleteCommand,
-	)
-
-	rootCmd.AddCommand(
-		responsesCommand,
-	)
-}
-
-var responsesCommand = &cobra.Command{
-	Use:   "responses",
-	Short: "Manage the OpenAI Responses API",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		startResponsesChat(cmd.Context(), client, chatModel)
-
-		return nil
-	},
-}
-
-var responsesChatCommand = &cobra.Command{
-	Use:   "chat",
-	Short: "Chat with the OpenAI Responses API",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		startResponsesChat(cmd.Context(), client, chatModel)
-
-		return nil
-	},
-}
-
-var responsesGetCommand = &cobra.Command{
-	Use:   "get",
-	Short: "Get a single response",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		resp, err := client.Responses.New(cmd.Context(), responses.ResponseNewParams{
-			Model: responses.ResponsesModel(chatModel),
-			Input: responses.ResponseNewParamsInputUnion{
-				OfString: openai.String(strings.Join(args, " ")),
-			},
-			ToolChoice: responses.ResponseNewParamsToolChoiceUnion{
-				OfToolChoiceMode: openai.Opt(responses.ToolChoiceOptionsAuto),
-			},
-			Tools: []responses.ToolUnionParam{
-				responses.ToolParamOfWebSearchPreview(responses.WebSearchToolTypeWebSearchPreview),
-			},
-			Store: openai.Bool(false),
-		})
-		if err != nil {
-			return fmt.Errorf("failed to create response: %w", err)
-		}
-
-		cmd.OutOrStdout().Write([]byte(resp.OutputText() + "\n"))
-
-		return nil
-	},
-}
-
-var responsesDeleteCommand = &cobra.Command{
-	Use:   "delete",
-	Short: "Delete a single response",
-	Args:  cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		respID := args[0]
-		if err := client.Responses.Delete(cmd.Context(), respID); err != nil {
-			return fmt.Errorf("failed to delete response %q: %w", respID, err)
-		}
-
-		fmt.Fprintf(cmd.OutOrStdout(), "Deleted response %q\n", respID)
-		return nil
-	},
-}
-
-func startResponsesChat(ctx context.Context, client *openai.Client, model string) error {
+func startResponsesChat(ctx context.Context, client *openai.Client, model string, in, out *os.File) (returnErr error) {
 	// Set the terminal to raw mode.
-	fd := int(os.Stdout.Fd())
+	fd := int(in.Fd())
 	oldState, err := term.MakeRaw(fd)
 	if err != nil {
 		return fmt.Errorf("failed to set terminal to raw mode: %w", err)
 	}
-	defer term.Restore(0, oldState)
+	defer term.Restore(fd, oldState)
 
-	termWidth, termHeight, err := term.GetSize(fd)
+	termWidth, termHeight, err := term.GetSize(int(out.Fd()))
 	if err != nil {
 		return fmt.Errorf("failed to get terminal size: %w", err)
 	}
 
+	inputReader, err := terminal.NewInput(ctx, in)
+	if err != nil {
+		return fmt.Errorf("initialize terminal input: %w", err)
+	}
+	defer inputReader.Close()
 	termReadWriter := struct {
 		io.Reader
 		io.Writer
-	}{os.Stdin, os.Stdout}
+	}{inputReader, out}
 
 	t := term.NewTerminal(termReadWriter, "") // Will set the prompt later.
 
@@ -222,33 +156,12 @@ func startResponsesChat(ctx context.Context, client *openai.Client, model string
 
 	var allRespIDs []string
 	defer func() {
-		total := len(allRespIDs)
-		if total == 0 {
+		if len(allRespIDs) == 0 {
 			return
 		}
-		bt.WriteString("\n")
+		fmt.Fprintf(bt, "\nDeleting %d stored responses...\n", len(allRespIDs))
 		bt.Flush()
-
-		for i, respID := range allRespIDs {
-			if err := client.Responses.Delete(ctx, respID); err != nil {
-				bt.WriteString(respID + ":" + err.Error() + "\n")
-				bt.Flush()
-				return
-			}
-			var (
-				progress      = i + 1
-				percent       = float64(progress) / float64(total)
-				barWidth      = 20
-				completedBars = int(percent * float64(barWidth))
-				remainingBars = barWidth - completedBars
-				progressBar   = strings.Repeat("█", completedBars) + strings.Repeat("_", remainingBars)
-			)
-			bt.WriteString(styleFaint.Render("\033[0G" + fmt.Sprintf("Deleting responses %s (%d/%d)", progressBar, progress, total)))
-			bt.Flush()
-		}
-		bt.WriteString("\n")
-		bt.WriteString("\n")
-		bt.Flush()
+		returnErr = errors.Join(returnErr, cleanupResponses(ctx, client, allRespIDs))
 	}()
 
 	var (
@@ -271,6 +184,9 @@ func startResponsesChat(ctx context.Context, client *openai.Client, model string
 
 		// Read up to line from STDIN.
 		input, err := t.ReadLine()
+		if err == io.EOF {
+			return nil
+		}
 		if err != nil {
 			bt.WriteString(err.Error())
 			bt.Flush()
@@ -310,6 +226,9 @@ func startResponsesChat(ctx context.Context, client *openai.Client, model string
 		}
 
 		fields := strings.Fields(input)
+		if len(fields) == 0 {
+			continue
+		}
 
 		switch fields[0] {
 		case "delete":
@@ -460,7 +379,7 @@ func startResponsesChat(ctx context.Context, client *openai.Client, model string
 				OfToolChoiceMode: openai.Opt(responses.ToolChoiceOptionsAuto),
 			},
 			Tools: []responses.ToolUnionParam{
-				responses.ToolParamOfWebSearchPreview(responses.WebSearchToolTypeWebSearchPreview),
+				responses.ToolParamOfWebSearchPreview(responses.WebSearchPreviewToolTypeWebSearchPreview),
 			},
 		})
 		if err != nil {
@@ -579,4 +498,18 @@ func printResponsesChatHelp(bt *bufio.Writer) {
 	bt.WriteString("Use " + styleAI.Render("@codex") + " to use Codex for code-related questions.\n")
 	bt.WriteString("\n")
 	bt.Flush()
+}
+
+// Cleanup remains bounded and best-effort even after the interactive request was
+// canceled. One failed deletion must not prevent attempts for the remaining IDs.
+func cleanupResponses(ctx context.Context, client *openai.Client, ids []string) error {
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+	defer cancel()
+	var failures []error
+	for _, id := range ids {
+		if err := client.Responses.Delete(cleanupCtx, id, option.WithMaxRetries(0)); err != nil {
+			failures = append(failures, fmt.Errorf("delete stored response %q: %w", id, err))
+		}
+	}
+	return errors.Join(failures...)
 }
