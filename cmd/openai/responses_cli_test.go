@@ -20,7 +20,10 @@ import (
 
 func TestMain(m *testing.M) {
 	if os.Getenv("OPENAI_CLI_PTY_HELPER") == "1" {
-		os.Args = []string{"openai"}
+		os.Args = []string{"openai", "--legacy"}
+		if os.Getenv("OPENAI_CLI_PTY_MODE") == "tui" {
+			os.Args = []string{"openai", "--temporary"}
+		}
 		if os.Getenv("OPENAI_CLI_PTY_MODE") == "chat" {
 			os.Args = append(os.Args, "chat", "--temporary")
 		}

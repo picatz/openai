@@ -10,6 +10,7 @@ import (
 
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/responses"
+	"github.com/picatz/openai/internal/conversation"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -50,7 +51,10 @@ func terminalFiles(cmd *cobra.Command) (*os.File, *os.File, bool) {
 
 func (app *application) runResponses(cmd *cobra.Command, args []string) error {
 	if in, out, interactive := terminalFiles(cmd); interactive && len(args) == 0 && app.output == "text" {
-		return startResponsesChat(cmd.Context(), &app.client, app.model, in, out)
+		if app.legacy {
+			return startResponsesChat(cmd.Context(), &app.client, app.model, in, out)
+		}
+		return app.runTUI(cmd, conversation.Responses)
 	}
 	return app.createResponse(cmd, args)
 }
@@ -94,6 +98,9 @@ func readPrompt(ctx context.Context, in io.Reader, args []string) (string, error
 }
 
 func (app *application) createResponse(cmd *cobra.Command, args []string) error {
+	if app.sessionID != "" {
+		return app.runSessionPrompt(cmd, args, conversation.Responses)
+	}
 	prompt, err := readPrompt(cmd.Context(), cmd.InOrStdin(), args)
 	if err != nil {
 		return err
