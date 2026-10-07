@@ -1,92 +1,74 @@
-# OpenAI [![Go Reference](https://pkg.go.dev/badge/github.com/picatz/openai.svg)](https://pkg.go.dev/github.com/picatz/openai) [![Go Report Card](https://goreportcard.com/badge/github.com/picatz/openai)](https://goreportcard.com/report/github.com/picatz/openai) [![License: MPL 2.0](https://img.shields.io/badge/License-MPL_2.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0) 
- 
-An unofficial community-maintained CLI application for [OpenAI](https://openai.com/).
+# OpenAI [![Go Reference](https://pkg.go.dev/badge/github.com/picatz/openai.svg)](https://pkg.go.dev/github.com/picatz/openai) [![License: MPL 2.0](https://img.shields.io/badge/License-MPL_2.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
 
-## Installation
+An unofficial community-maintained OpenAI CLI and Go wrapper for the Codex CLI.
 
-```console
-$ go install github.com/picatz/openai/cmd/openai@latest
+## Install
+
+Requires Go 1.27 or newer.
+
+```sh
+go install github.com/picatz/openai/cmd/openai@latest
 ```
 
-> [!IMPORTANT] 
-> To use the CLI you must have a valid `OPENAI_API_KEY` environment variable set. You can get one [here](https://platform.openai.com/).
+Set `OPENAI_API_KEY` in your environment. Obtain a key from the [OpenAI platform](https://platform.openai.com/). Requests use your account and may incur API charges. Never commit keys or paste them into bug reports.
 
-> [!TIP]
-> You can customize which model is used by setting the `OPENAI_MODEL` environment variable. The default is `gpt-4o` today, but it may change in the future.
+## Responses
 
-### Usage
+With a terminal attached, `openai` or `openai responses chat` opens the Responses chat. One-shot commands and piped input use plain stdout without terminal control sequences:
 
-```console
-$ openai --help
-OpenAI CLI
-
-Usage:
-  openai [flags]
-  openai [command]
-
-Available Commands:
-  assistant   Start an interactive assistant chat session
-  chat        Chat with the OpenAI API
-  completion  Generate the autocompletion script for the specified shell
-  help        Help about any command
-  image       Generate an image with DALL·E
-  responses   Manage the OpenAI Responses API
-
-Flags:
-  -h, --help   help for openai
-
-Use "openai [command] --help" for more information about a command.
+```sh
+openai responses create 'Explain Go contexts'
+printf 'Explain Go contexts' | openai
+cat question.txt | openai responses create -
+openai responses create 'Explain Go contexts' --stream
+openai responses create 'Explain Go contexts' --output json
+openai responses create 'Explain Go contexts' --stream --output json
+openai responses get resp_123 --output json
+openai responses delete resp_123
 ```
 
-```console
-$ openai assistant --help
-Interact with the OpenAI API using the assistant API.
+`--stream` prints text deltas as they arrive. With `--output json`, it emits one complete API response after successful completion, including usage and response ID. Failures go to stderr with a nonzero exit code; canceled commands exit with code 130. A truncated, failed, or incomplete stream is an error, even if partial text has already reached stdout.
 
-This can be used to create a temporary assistant, or interact with an existing assistant.
+One-shot creation sets `store: false`. Retrieval/deletion requires an existing response stored by another request. Web search is off by default for one-shot requests; add `--web-search` to enable it. Interactive Responses chat currently retains its previous temporary server-storage and web-search behavior; it attempts to delete its responses on exit.
 
-Usage:
-  openai assistant [flags]
-  openai assistant [command]
+**Migration:** `responses get` now retrieves a response by ID. To generate a response from a prompt, replace the old `responses get 'prompt'` form with `responses create 'prompt'`. The removed Assistants commands have been deprecated in favor of Responses.
 
-Examples:
-  $ openai assistant      # create a temporary assistant and start chatting
-  $ openai assistant chat # same as above
-  $ openai assistant create --name "Example" --model "gpt-4-turbo-preview" --description "..." --instructions "..." --code-interpreter --retrieval
-  $ openai assistant list
-  $ openai assistant info <assistant-id>
-  $ openai assistant chat <assistant-id>
-  $ openai assistant delete <assistant-id>
+## Configuration
 
-Available Commands:
-  chat        Start an interactive assistant chat session
-  create      Create an assistant
-  delete      Delete an assistant
-  file        Manage assistant files
-  info        Get information about an assistant
-  list        List assistants
-  update      Update an assistant
+All commands use the same SDK client configuration:
 
-Flags:
-  -h, --help   help for assistant
+- `OPENAI_API_KEY`: API authentication
+- `OPENAI_MODEL` or `--model`: text model (default `gpt-4o`, retained for compatibility)
+- `OPENAI_BASE_URL` or `--base-url`: alternate API base URL
+- `OPENAI_API_URL`: supported legacy base URL alias, only used when `OPENAI_BASE_URL` is absent
+- `OPENAI_ORG_ID` and `OPENAI_PROJECT_ID`: SDK organization/project options
+- `--timeout`: per-request timeout (default `2m`; `0` disables it)
 
-Use "openai assistant [command] --help" for more information about a command.
+Flags take precedence over environment variables. The image command has its own image-model flag. `--help` and shell completion do not require credentials.
+
+### Legacy Chat Completions and local models
+
+`openai chat` keeps the existing Chat Completions terminal and Pebble history format. `openai chat --temporary` uses memory-only history. Existing history at `~/.openai-cli-chat-pebble-storage-cache` is preserved; no migration or automatic deletion is performed.
+
+An OpenAI-compatible Chat Completions server can be selected with:
+
+```sh
+OPENAI_MODEL='your-local-model' OPENAI_BASE_URL='http://localhost:11434/v1/' openai chat
 ```
 
-> [!TIP]
->
-> If provided no arguments, the CLI will default to the `assistant` command with an ephemeral session,
-> meaning messages and files will be deleted after exiting the session.
+Responses support depends on the chosen server. The text/JSON/stream one-shot output flags above apply to Responses operations; the legacy chat and image interfaces retain their existing output behavior.
 
-#### With Ollama
+## Development and verification
 
-You can use the CLI with [Ollama](https://ollama.com/) to use models that are run locally, such as [IBM Granite](https://ollama.com/library/granite3.1-dense).
-
-```console
-$ brew install ollama
-...
-$ ollama serve &
-...
-$ ollama run granite3.1-dense:2b
-...
-$ OPENAI_MODEL="granite3.1-dense:2b" OPENAI_API_URL="http://localhost:11434/v1/" openai chat
+```sh
+go test ./...
+go test -race ./...
+go vet ./...
+go build ./cmd/openai
 ```
+
+The default suite is hermetic: API calls use synthetic transports and Codex process tests execute the test binary as a fake helper. No API key, installed Codex, microphone, or paid model access is needed. CI runs those checks on Linux, macOS, and Windows.
+
+Historical live integration examples are separately gated. Running them requires both the `integration` build tag and `OPENAI_LIVE_TESTS=1`, plus deliberately configured credentials and an installed Codex CLI. They can incur charges, clone external repositories, and let Codex change temporary checkouts. They are not part of CI. Never enable them merely to run the normal test suite.
+
+This modernization is staged: reliable CLI/SDK/test foundations first, followed by the Bubble Tea interface and newer API capabilities. Live-service and real-device verification is separate from mock coverage.

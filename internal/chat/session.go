@@ -14,8 +14,9 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/openai/openai-go"
+	"github.com/openai/openai-go/v3"
 	"github.com/picatz/openai/internal/chat/storage"
+	"github.com/picatz/openai/internal/terminal"
 	"github.com/segmentio/ksuid"
 	"golang.org/x/term"
 )
@@ -302,9 +303,9 @@ func NewSession(ctx context.Context, client *openai.Client, chatModel string, r 
 	)
 
 	// If we're running in a terminal, set it to "raw" mode.
-	if stdout, ok := w.(*os.File); ok {
+	if stdin, ok := r.(*os.File); ok && term.IsTerminal(int(stdin.Fd())) {
 		// Get the file descriptor (number) for the terminal.
-		fd := int(stdout.Fd())
+		fd := int(stdin.Fd())
 
 		// Set the terminal to raw mode.
 		oldState, err := term.MakeRaw(fd)
@@ -321,6 +322,15 @@ func NewSession(ctx context.Context, client *openai.Client, chatModel string, r 
 				fmt.Fprintf(os.Stderr, "\nfailed to restore terminal: %s\n", err)
 			}
 		}
+
+		inputReader, err := terminal.NewInput(ctx, stdin)
+		if err != nil {
+			restoreFunc()
+			return nil, nil, fmt.Errorf("initialize terminal input: %w", err)
+		}
+		restoreTerminal := restoreFunc
+		restoreFunc = func() { inputReader.Close(); restoreTerminal() }
+		r = inputReader
 
 		// Get the terminal size.
 		//
@@ -395,7 +405,7 @@ func (cs *Session) ShowHelp() {
 }
 
 // Run starts the main loop of the chat session.
-func (cs *Session) Run(ctx context.Context) {
+func (cs *Session) Run(ctx context.Context) error {
 	cs.clearScreen()
 
 	// User is new, show the welcome message.
@@ -407,8 +417,14 @@ func (cs *Session) Run(ctx context.Context) {
 	}
 
 	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		done, err := cs.RunOnce(ctx)
 		if err != nil {
+			if done || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				return err
+			}
 			cs.OutWriter.WriteString(fmt.Sprintf("Error: %s\n", err))
 			cs.OutWriter.Flush()
 			if !done {
@@ -425,7 +441,9 @@ func (cs *Session) Run(ctx context.Context) {
 	if err := cs.saveCache(ctx); err != nil {
 		cs.OutWriter.WriteString(fmt.Sprintf("Failed to save chat history: %s\n", err))
 		cs.OutWriter.Flush()
+		return fmt.Errorf("save chat history: %w", err)
 	}
+	return nil
 }
 
 func doneWithoutError() (bool, error) {

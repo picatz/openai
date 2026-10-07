@@ -3,7 +3,7 @@ package memory_test
 import (
 	"testing"
 
-	"github.com/openai/openai-go"
+	"github.com/openai/openai-go/v3"
 	"github.com/picatz/openai/internal/chat/storage/memory"
 	"github.com/picatz/openai/internal/chat/storage/tests"
 )

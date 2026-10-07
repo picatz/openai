@@ -3,7 +3,7 @@ package tests
 import (
 	"testing"
 
-	"github.com/openai/openai-go"
+	"github.com/openai/openai-go/v3"
 	"github.com/picatz/openai/internal/chat/storage"
 	"github.com/shoenig/test/must"
 )
