@@ -1,7 +1,9 @@
 package codex
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -30,8 +32,13 @@ func createOutputSchemaFile(schema any) (*outputSchemaFile, error) {
 		return &outputSchemaFile{cleanup: func() error { return nil }}, nil
 	}
 
-	if err := ensureStructuredOutputIsJSONObject(schema); err != nil {
+	data, err := json.Marshal(schema)
+	if err != nil {
 		return nil, err
+	}
+	trimmed := bytes.TrimSpace(data)
+	if len(trimmed) == 0 || trimmed[0] != '{' {
+		return nil, fmt.Errorf("output schema must marshal to a JSON object")
 	}
 
 	dir, err := os.MkdirTemp("", "codex-output-schema-")
@@ -41,12 +48,6 @@ func createOutputSchemaFile(schema any) (*outputSchemaFile, error) {
 
 	cleanup := func() error {
 		return os.RemoveAll(dir)
-	}
-
-	data, err := json.Marshal(schema)
-	if err != nil {
-		cleanup()
-		return nil, err
 	}
 
 	path := filepath.Join(dir, "schema.json")

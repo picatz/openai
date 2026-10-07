@@ -86,6 +86,10 @@ Text mode prints the saved session ID on stderr. Session mode JSON emits `{sessi
 
 `--legacy` preserves the former terminal commands, including file/URL/clipboard expansion and Codex delegation. Those shortcuts are not automatically interpreted by the new text-focused UI.
 
+## Codex Go package
+
+The [`codex` package](codex/README.md) wraps `codex exec --json`, with resumable threads, structured output, cancellation, and forward-compatible events. It requires a separately installed Codex CLI. See the package guide for permission options, compatibility scope, and stream cleanup.
+
 ## Development and verification
 
 ```sh
