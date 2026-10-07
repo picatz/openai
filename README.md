@@ -100,3 +100,33 @@ The default suite is hermetic: API calls use synthetic transports and Codex proc
 Historical live integration examples are separately gated. Running them requires both the `integration` build tag and `OPENAI_LIVE_TESTS=1`, plus deliberately configured credentials and an installed Codex CLI. They can incur charges, clone external repositories, and let Codex change temporary checkouts. They are not part of CI. Never enable them merely to run the normal test suite.
 
 This modernization is staged: the CLI/SDK/test foundations and Bubble Tea interface precede provider proxy and newer API capabilities. Live-service and real-device verification is separate from mock coverage.
+
+## Decisions (public beta)
+
+The native Decisions endpoint evaluates typed predicates, choices, and ordered scores. This first interface accepts text, including stdin; it does not translate Decisions into Chat/Responses requests on other providers.
+
+```sh
+openai decisions predicate 'This item is damaged' --question 'Is damage reported?'
+openai decisions choice 'I need a refund' --question 'Which team should help?' \
+  --choice 'billing=Payments and refunds' --choice 'support=Product usage'
+openai decisions score 'The service is unavailable' --question 'How severe is the issue?' \
+  --level 'low=Minor inconvenience' --level 'high=Work is blocked' --output json
+```
+
+The default is `gpt-6-luna`, the model currently documented for the public beta. Predicate values are probabilities, choice values select one supplied option, and scores are probability-weighted averages of zero-based level indices. JSON output retains the complete probability distributions and unknown response fields. Confidence is a model estimate, not a guarantee; validate thresholds against your own labeled data. Availability and beta behavior can change; see the [official Decisions guide](https://developers.openai.com/api/docs/guides/decisions).
+
+## File audio
+
+```sh
+openai audio transcribe recording.wav
+openai audio transcribe recording.wav --output json
+openai audio speech 'Hello from the CLI' --file speech.mp3
+printf 'Read this aloud' | openai audio speech --voice cedar --format wav --file speech.wav
+openai audio speech 'Hello' --format pcm --file - > speech.pcm
+```
+
+Transcription defaults to `gpt-transcribe`; speech defaults to `gpt-4o-mini-tts` with the `marin` voice. Both can be selected with the subcommand's `--model`. Transcription accepts a regular file up to 25 MB. Speech accepts at most 4096 characters and supports MP3, Opus, AAC, FLAC, WAV, and PCM. Raw PCM is not a WAV container.
+
+Speech output never overwrites an existing file. A complete owner-readable temporary file is published without replacing another writer's destination; request or write errors remove the temporary data. Binary stdout must be redirected away from a terminal. These commands do not record from a microphone or play audio automatically. Make clear to listeners that generated speech is AI-generated. See [file transcription](https://developers.openai.com/api/docs/guides/speech-to-text) and [text to speech](https://developers.openai.com/api/docs/guides/text-to-speech) for model-specific capabilities.
+
+The tests use in-memory mock HTTP transports and a generated silent WAV fixture. No recording, playback, real API call, or paid-service validation is part of the default tests. GPT-Live is a separate session protocol and is not emulated by combining these file-audio commands.
