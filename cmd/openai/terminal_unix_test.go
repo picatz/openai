@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 	"os/exec"
 	"reflect"
@@ -26,6 +27,9 @@ func TestIdleTerminalCancellationRestoresState(t *testing.T) {
 				}
 				defer master.Close()
 				defer slave.Close()
+				// A real terminal consumes output. Drain the PTY so the welcome/help
+				// screen cannot fill the smaller macOS buffer before input is read.
+				go func() { _, _ = io.Copy(io.Discard, master) }()
 				if err := pty.Setsize(master, &pty.Winsize{Rows: 24, Cols: 80}); err != nil {
 					t.Fatal(err)
 				}
