@@ -13,13 +13,17 @@ import (
 )
 
 type application struct {
-	client    openai.Client
-	model     string
-	baseURL   string
-	timeout   time.Duration
-	output    string
-	stream    bool
-	webSearch bool
+	legacy     bool
+	temporary  bool
+	historyDir string
+	sessionID  string
+	client     openai.Client
+	model      string
+	baseURL    string
+	timeout    time.Duration
+	output     string
+	stream     bool
+	webSearch  bool
 }
 
 // newRootCommand constructs independent command trees. SDK environment defaults
@@ -30,6 +34,12 @@ func newRootCommand(options ...option.RequestOption) *cobra.Command {
 	root := &cobra.Command{
 		Use: "openai [prompt]", Args: cobra.ArbitraryArgs, Short: "OpenAI CLI", SilenceUsage: true, SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			if app.legacy && app.sessionID != "" {
+				return fmt.Errorf("--session is not supported with --legacy")
+			}
+			if app.temporary && app.sessionID != "" {
+				return fmt.Errorf("--temporary and --session cannot be combined")
+			}
 			if app.timeout < 0 {
 				return fmt.Errorf("timeout must not be negative")
 			}
@@ -61,6 +71,10 @@ func newRootCommand(options ...option.RequestOption) *cobra.Command {
 	root.PersistentFlags().StringVarP(&app.output, "output", "o", "text", "Output format: text or json")
 	root.PersistentFlags().BoolVar(&app.stream, "stream", false, "Stream response text; JSON emits one completed response")
 	root.PersistentFlags().BoolVar(&app.webSearch, "web-search", false, "Enable the Responses web search tool")
-	root.AddCommand(newResponsesCommand(app), newChatCommand(app), newImageCommand(app), newAssistantCommand())
+	root.PersistentFlags().BoolVar(&app.legacy, "legacy", false, "Use the previous terminal interface and history")
+	root.PersistentFlags().BoolVarP(&app.temporary, "temporary", "t", false, "Do not save local session history")
+	root.PersistentFlags().StringVar(&app.historyDir, "history-dir", defaultHistoryDir(), "Local session history directory")
+	root.PersistentFlags().StringVar(&app.sessionID, "session", "", "Continue a local session ID, or use new to create one")
+	root.AddCommand(newResponsesCommand(app), newChatCommand(app), newImageCommand(app), newAssistantCommand(), newSessionsCommand(app))
 	return root
 }

@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 	"os/exec"
 	"reflect"
@@ -17,8 +18,11 @@ import (
 )
 
 func TestIdleTerminalCancellationRestoresState(t *testing.T) {
-	for _, mode := range []string{"responses", "chat"} {
+	for _, mode := range []string{"responses", "chat", "tui"} {
 		for _, action := range []string{"SIGTERM", "Ctrl-C", "Ctrl-D"} {
+			if mode == "tui" && action == "Ctrl-D" {
+				continue
+			}
 			t.Run(mode+"/"+action, func(t *testing.T) {
 				master, slave, err := pty.Open()
 				if err != nil {
@@ -26,6 +30,7 @@ func TestIdleTerminalCancellationRestoresState(t *testing.T) {
 				}
 				defer master.Close()
 				defer slave.Close()
+				go io.Copy(io.Discard, master)
 				if err := pty.Setsize(master, &pty.Winsize{Rows: 24, Cols: 80}); err != nil {
 					t.Fatal(err)
 				}
@@ -66,6 +71,9 @@ func TestIdleTerminalCancellationRestoresState(t *testing.T) {
 					time.Sleep(5 * time.Millisecond)
 				}
 				wantCode := 130
+				if mode == "tui" && action == "Ctrl-C" {
+					wantCode = 0
+				}
 				switch action {
 				case "SIGTERM":
 					err = cmd.Process.Signal(syscall.SIGTERM)
