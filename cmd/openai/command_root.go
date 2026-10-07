@@ -75,6 +75,6 @@ func newRootCommand(options ...option.RequestOption) *cobra.Command {
 	root.PersistentFlags().BoolVarP(&app.temporary, "temporary", "t", false, "Do not save local session history")
 	root.PersistentFlags().StringVar(&app.historyDir, "history-dir", defaultHistoryDir(), "Local session history directory")
 	root.PersistentFlags().StringVar(&app.sessionID, "session", "", "Continue a local session ID, or use new to create one")
-	root.AddCommand(newResponsesCommand(app), newChatCommand(app), newImageCommand(app), newAssistantCommand(), newSessionsCommand(app))
+	root.AddCommand(newResponsesCommand(app), newChatCommand(app), newImageCommand(app), newAssistantCommand(), newSessionsCommand(app), newDecisionsCommand(app), newAudioCommand(app))
 	return root
 }
