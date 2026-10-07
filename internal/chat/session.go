@@ -177,12 +177,13 @@ var builtinCommands = []Command{
 			return strings.HasPrefix(strings.TrimSpace(input), "system:")
 		},
 		Run: func(ctx context.Context, s *Session, input string) {
-			systemMsg := openai.ChatCompletionMessage{
-				Role:    "system",
-				Content: input,
+			prompt := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(input), "system:"))
+			s.setSystemContext(prompt)
+			if prompt == "" {
+				s.OutWriter.WriteString("System context cleared.\n")
+			} else {
+				s.OutWriter.WriteString("System context updated.\n")
 			}
-			s.Messages = append(s.Messages, systemMsg)
-			s.OutWriter.WriteString("System context updated.\n")
 		},
 	},
 	{
@@ -275,6 +276,8 @@ type ReqRespPair struct {
 // Session encapsulates the state and behavior of a CLI chat session.
 // It manages terminal I/O, conversation history, caching, and command processing.
 type Session struct {
+	explicitSystemPrompt       string
+	hasExplicitSystemPrompt    bool
 	Client                     *openai.Client
 	ChatModel                  string
 	StorageBackend             storage.Backend[string, ReqRespPair]
@@ -742,10 +745,20 @@ func (cs *Session) maybeSummarize(ctx context.Context) error {
 			return err
 		}
 
-		cs.Messages = []openai.ChatCompletionMessage{{
-			Role:    "system",
-			Content: "Summary of previous messages for context: " + summary,
-		}}
+		// Retain the active instruction, but treat generated summaries as
+		// conversation data rather than privileged system instructions.
+		var active *openai.ChatCompletionMessage
+		for _, message := range cs.Messages {
+			if message.Role == "system" && !cs.isLegacySummary(message) {
+				copy := message
+				active = &copy
+			}
+		}
+		messages := []openai.ChatCompletionMessage{}
+		if active != nil {
+			messages = append(messages, *active)
+		}
+		cs.Messages = append(messages, openai.ChatCompletionMessage{Role: "assistant", Content: summaryPrefix + summary})
 		cs.CurrentTokensUsed = summaryTokens
 
 		if err := cs.saveCache(ctx); err != nil {
@@ -773,6 +786,9 @@ func (cs *Session) summarize(ctx context.Context, attempts int) (string, int64, 
 	var b strings.Builder
 	for _, m := range cs.Messages {
 		if m.Role == "system" {
+			if cs.isLegacySummary(m) {
+				b.WriteString("assistant:\n" + m.Content + "\n")
+			}
 			continue
 		}
 		b.WriteString(string(m.Role) + ":\n" + m.Content + "\n")
@@ -850,4 +866,38 @@ func (cs *Session) autoComplete(line string, pos int, key rune) (string, int, bo
 		}
 	}
 	return line, pos, false
+}
+
+const summaryPrefix = "Summary of previous messages for context: "
+
+func (cs *Session) isLegacySummary(message openai.ChatCompletionMessage) bool {
+	// An explicitly set instruction is never inferred to be a legacy summary
+	// solely because its text happens to begin with the historical marker.
+	if cs.hasExplicitSystemPrompt && message.Content == cs.explicitSystemPrompt {
+		return false
+	}
+	return message.Role == "system" && strings.HasPrefix(message.Content, summaryPrefix)
+}
+
+// setSystemContext implements replacement, not an accumulating instruction log.
+// Providers whose templates inspect only the first system message now receive
+// the current instruction in that first position. Stored request/response pairs
+// are not rewritten or deleted by this in-memory operation.
+func (cs *Session) setSystemContext(prompt string) {
+	messages := make([]openai.ChatCompletionMessage, 0, len(cs.Messages)+1)
+	if prompt != "" {
+		messages = append(messages, openai.ChatCompletionMessage{Role: "system", Content: prompt})
+	}
+	for _, message := range cs.Messages {
+		if message.Role == "system" {
+			if !cs.isLegacySummary(message) {
+				continue
+			}
+			message.Role = "assistant"
+		}
+		messages = append(messages, message)
+	}
+	cs.Messages = messages
+	cs.explicitSystemPrompt = prompt
+	cs.hasExplicitSystemPrompt = true
 }
