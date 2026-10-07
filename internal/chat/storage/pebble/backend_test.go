@@ -17,6 +17,7 @@ func TestBackend_dir(t *testing.T) {
 	b, err := backendPebble.NewBackend(t.TempDir(), nil, &storage.JSONCodec[string, string]{})
 	must.NoError(t, err)
 	must.NotNil(t, b)
+	// t.Context is canceled before cleanup; Close currently ignores its context.
 	t.Cleanup(func() {
 		if err := b.Close(context.Background()); err != nil {
 			t.Errorf("close backend: %v", err)
@@ -34,6 +35,7 @@ func TestBackend_mem_vfs(t *testing.T) {
 	b, err := backendPebble.NewBackend("", opts, &storage.JSONCodec[string, string]{})
 	must.NoError(t, err)
 	must.NotNil(t, b)
+	// t.Context is canceled before cleanup; Close currently ignores its context.
 	t.Cleanup(func() {
 		if err := b.Close(context.Background()); err != nil {
 			t.Errorf("close backend: %v", err)
@@ -53,6 +55,7 @@ func TestBackend_mem_vfs_openai_chat_messages(t *testing.T) {
 	b, err := backendPebble.NewBackend("", opts, codec)
 	must.NoError(t, err)
 	must.NotNil(t, b)
+	// t.Context is canceled before cleanup; Close currently ignores its context.
 	t.Cleanup(func() {
 		if err := b.Close(context.Background()); err != nil {
 			t.Errorf("close backend: %v", err)
