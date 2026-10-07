@@ -10,6 +10,7 @@ import (
 	"github.com/picatz/openai/internal/chat"
 	"github.com/picatz/openai/internal/chat/storage"
 	pebbleStorage "github.com/picatz/openai/internal/chat/storage/pebble"
+	"github.com/picatz/openai/internal/conversation"
 	"github.com/spf13/cobra"
 )
 
@@ -28,10 +29,23 @@ func (l *stderrLoggerAndTracer) IsTracingEnabled(ctx context.Context) bool {
 
 func newChatCommand(app *application) *cobra.Command {
 	chatCommand := &cobra.Command{
-		Use:   "chat",
-		Args:  cobra.NoArgs,
+		Use:   "chat [prompt]",
+		Args:  cobra.ArbitraryArgs,
 		Short: "Chat with the OpenAI API",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if !app.legacy {
+				if _, _, tty := terminalFiles(cmd); tty && len(args) == 0 && app.output == "text" {
+					return app.runTUI(cmd, conversation.Chat)
+				}
+				return app.createChat(cmd, args)
+			}
+			if len(args) != 0 {
+				return fmt.Errorf("legacy chat does not accept a prompt argument")
+			}
+			if app.sessionID != "" {
+				return fmt.Errorf("--session is not supported by the legacy chat")
+			}
+
 			codec := &storage.JSONCodec[string, chat.ReqRespPair]{}
 
 			var opts = &pebble.Options{
@@ -58,8 +72,6 @@ func newChatCommand(app *application) *cobra.Command {
 			return chatSession.Run(cmd.Context())
 		},
 	}
-
-	chatCommand.Flags().BoolP("temporary", "t", false, "Use a temporary in-memory chat storage backend")
 
 	return chatCommand
 }
