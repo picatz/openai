@@ -21,9 +21,11 @@ const (
 
 // Usage reports token usage for a turn.
 type Usage struct {
-	InputTokens       int `json:"input_tokens"`
-	CachedInputTokens int `json:"cached_input_tokens"`
-	OutputTokens      int `json:"output_tokens"`
+	InputTokens           int `json:"input_tokens"`
+	CachedInputTokens     int `json:"cached_input_tokens"`
+	OutputTokens          int `json:"output_tokens"`
+	CacheWriteInputTokens int `json:"cache_write_input_tokens"`
+	ReasoningOutputTokens int `json:"reasoning_output_tokens"`
 }
 
 // ThreadError describes a fatal error emitted by a turn.
@@ -45,6 +47,9 @@ type ThreadEvent struct {
 	Item ThreadItem `json:"item,omitempty"`
 	// Message is populated on top-level error events.
 	Message string `json:"message,omitempty"`
+	// Raw is an owned copy of the complete original event, including unknown fields
+	// and event kinds. It is excluded from marshaling; decode it for future extensions.
+	Raw json.RawMessage `json:"-"`
 }
 
 // String renders a human-readable description of the event for debugging and tests.
@@ -109,6 +114,24 @@ func itemSummary(item ThreadItem) string {
 
 // UnmarshalJSON customizes decoding to handle the polymorphic item payload.
 func (e *ThreadEvent) UnmarshalJSON(data []byte) error {
+	var discriminator struct {
+		Type EventType `json:"type"`
+	}
+	if err := json.Unmarshal(data, &discriminator); err != nil {
+		return err
+	}
+	if discriminator.Type == "" {
+		return fmt.Errorf("thread event missing type discriminator")
+	}
+	switch discriminator.Type {
+	case EventTypeThreadStarted, EventTypeTurnStarted, EventTypeTurnCompleted,
+		EventTypeTurnFailed, EventTypeItemStarted, EventTypeItemUpdated,
+		EventTypeItemCompleted, EventTypeError:
+	default:
+		// A future event need not follow today's item or usage schemas.
+		*e = ThreadEvent{Type: discriminator.Type, Raw: append(json.RawMessage(nil), data...)}
+		return nil
+	}
 	var aux struct {
 		Type     EventType       `json:"type"`
 		ThreadID string          `json:"thread_id,omitempty"`
@@ -121,21 +144,38 @@ func (e *ThreadEvent) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	e.Type = aux.Type
-	e.ThreadID = aux.ThreadID
-	e.Usage = aux.Usage
-	e.Error = aux.Error
-	e.Message = aux.Message
-
-	if len(aux.Item) > 0 {
+	if aux.Type == "" {
+		return fmt.Errorf("thread event missing type discriminator")
+	}
+	decoded := ThreadEvent{Type: aux.Type, ThreadID: aux.ThreadID, Usage: aux.Usage,
+		Error: aux.Error, Message: aux.Message, Raw: append(json.RawMessage(nil), data...)}
+	switch aux.Type {
+	case EventTypeItemStarted, EventTypeItemUpdated, EventTypeItemCompleted:
+		if len(aux.Item) == 0 || string(aux.Item) == "null" {
+			return fmt.Errorf("%s missing item", aux.Type)
+		}
+	case EventTypeThreadStarted:
+		if aux.ThreadID == "" {
+			return fmt.Errorf("thread.started missing thread_id")
+		}
+	case EventTypeTurnCompleted:
+		if aux.Usage == nil {
+			return fmt.Errorf("turn.completed missing usage")
+		}
+	case EventTypeTurnFailed:
+		if aux.Error == nil {
+			return fmt.Errorf("turn.failed missing error")
+		}
+	}
+	switch aux.Type {
+	case EventTypeItemStarted, EventTypeItemUpdated, EventTypeItemCompleted:
 		item, err := UnmarshalThreadItem(aux.Item)
 		if err != nil {
 			return fmt.Errorf("decode thread item: %w", err)
 		}
-		e.Item = item
-	} else {
-		e.Item = nil
+		decoded.Item = item
 	}
+	*e = decoded
 
 	return nil
 }

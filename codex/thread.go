@@ -1,13 +1,9 @@
 package codex
 
 import (
-	"bufio"
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"sync"
 )
 
@@ -19,6 +15,36 @@ type Thread struct {
 
 	mu sync.RWMutex
 	id string
+}
+
+// NewThread prepares a conversation; it does not start a Codex process until Run.
+// Use ResumeThread to continue a persisted thread by ID.
+func NewThread(options Options, threadOptions ThreadOptions) (*Thread, error) {
+	executor, err := NewExec(options.CodexPathOverride)
+	if err != nil {
+		return nil, err
+	}
+	threadOptions.ConfigOverrides = append([]string(nil), threadOptions.ConfigOverrides...)
+	threadOptions.AdditionalDirectories = append([]string(nil), threadOptions.AdditionalDirectories...)
+	if threadOptions.NetworkAccessEnabled != nil {
+		value := *threadOptions.NetworkAccessEnabled
+		threadOptions.NetworkAccessEnabled = &value
+	}
+	return &Thread{exec: executor, options: options, threadOptions: threadOptions}, nil
+}
+
+// ResumeThread prepares a conversation using a previously returned ID. The CLI
+// validates that the thread exists when the next turn starts.
+func ResumeThread(id string, options Options, threadOptions ThreadOptions) (*Thread, error) {
+	if id == "" {
+		return nil, errors.New("thread ID must not be empty")
+	}
+	thread, err := NewThread(options, threadOptions)
+	if err != nil {
+		return nil, err
+	}
+	thread.id = id
+	return thread, nil
 }
 
 // ID returns the identifier of the thread once assigned by the codex backend.
@@ -64,6 +90,7 @@ type StreamedTurn struct {
 	waitFn   func() error
 	waitOnce sync.Once
 	waitErr  error
+	cancel   context.CancelFunc
 }
 
 // Wait blocks until the underlying run completes and returns the terminal error, if any.
@@ -74,6 +101,19 @@ func (s *StreamedTurn) Wait() error {
 		}
 	})
 	return s.waitErr
+}
+
+// Close cancels the turn and waits for cleanup, including its output-schema file.
+// Call it if you stop consuming Events before the channel closes.
+func (s *StreamedTurn) Close() error {
+	if s.cancel != nil {
+		s.cancel()
+	}
+	err := s.Wait()
+	if errors.Is(err, context.Canceled) {
+		return nil
+	}
+	return err
 }
 
 // RunStreamedResult aliases StreamedTurn for parity with the TypeScript SDK.
@@ -95,6 +135,7 @@ func (t *Thread) Run(ctx context.Context, input Input, turnOptions *TurnOptions)
 		finalResponse string
 		usage         *Usage
 		turnFailure   *ThreadError
+		completed     bool
 	)
 
 loop:
@@ -108,6 +149,7 @@ loop:
 				items = append(items, event.Item)
 			}
 		case EventTypeTurnCompleted:
+			completed = true
 			usage = event.Usage
 		case EventTypeTurnFailed:
 			if event.Error != nil {
@@ -124,13 +166,17 @@ loop:
 
 	if turnFailure != nil {
 		if waitErr != nil && !errors.Is(waitErr, context.Canceled) {
-			return Turn{}, waitErr
+			return Turn{}, errors.Join(errors.New(turnFailure.Message), waitErr)
 		}
 		return Turn{}, errors.New(turnFailure.Message)
 	}
 
 	if waitErr != nil {
 		return Turn{}, waitErr
+	}
+
+	if !completed {
+		return Turn{}, fmt.Errorf("codex stream ended before turn.completed")
 	}
 
 	return Turn{Items: items, FinalResponse: finalResponse, Usage: usage}, nil
@@ -142,7 +188,9 @@ func (t *Thread) RunText(ctx context.Context, prompt string, turnOptions *TurnOp
 }
 
 // RunStreamed streams events for a single agent turn. Callers should drain Events
-// and then invoke Wait to retrieve any terminal error from the CLI.
+// and then invoke Wait to retrieve any terminal error from the CLI. If they stop
+// reading early, they must call Close or cancel ctx before Wait. Run consecutive
+// turns serially; concurrent turns on the same conversation are not supported.
 func (t *Thread) RunStreamed(ctx context.Context, input Input, turnOptions *TurnOptions) (*StreamedTurn, error) {
 	return t.runStreamedInternal(ctx, input, turnOptions)
 }
@@ -153,6 +201,9 @@ func (t *Thread) RunStreamedText(ctx context.Context, prompt string, turnOptions
 }
 
 func (t *Thread) runStreamedInternal(ctx context.Context, input Input, turnOptions *TurnOptions) (*StreamedTurn, error) {
+	if t.exec == nil {
+		return nil, errors.New("uninitialized thread: use NewThread or ResumeThread")
+	}
 	if turnOptions == nil {
 		turnOptions = &TurnOptions{}
 	}
@@ -168,96 +219,58 @@ func (t *Thread) runStreamedInternal(ctx context.Context, input Input, turnOptio
 		return nil, err
 	}
 
-	stream, err := t.exec.Run(ctx, Args{
-		Input:            prompt,
-		BaseURL:          t.options.BaseURL,
-		APIKey:           t.options.APIKey,
-		ThreadID:         t.currentID(),
-		Images:           images,
-		Model:            t.threadOptions.Model,
-		SandboxMode:      t.threadOptions.SandboxMode,
-		WorkingDirectory: t.threadOptions.WorkingDirectory,
-		SkipGitRepoCheck: t.threadOptions.SkipGitRepoCheck,
-		OutputSchemaFile: schemaFile.Path(),
+	runCtx, cancel := context.WithCancel(ctx)
+	stream, err := t.exec.Run(runCtx, Args{
+		Input:                 prompt,
+		BaseURL:               t.options.BaseURL,
+		APIKey:                t.options.APIKey,
+		ThreadID:              t.currentID(),
+		Images:                images,
+		Model:                 t.threadOptions.Model,
+		SandboxMode:           t.threadOptions.SandboxMode,
+		WorkingDirectory:      t.threadOptions.WorkingDirectory,
+		SkipGitRepoCheck:      t.threadOptions.SkipGitRepoCheck,
+		OutputSchemaFile:      schemaFile.Path(),
+		ApprovalPolicy:        t.threadOptions.ApprovalPolicy,
+		ModelReasoningEffort:  t.threadOptions.ModelReasoningEffort,
+		AdditionalDirectories: t.threadOptions.AdditionalDirectories,
+		NetworkAccessEnabled:  t.threadOptions.NetworkAccessEnabled,
+		WebSearchMode:         t.threadOptions.WebSearchMode,
+		ConfigOverrides:       t.threadOptions.ConfigOverrides,
 	})
 	if err != nil {
+		cancel()
 		_ = schemaFile.Cleanup()
 		return nil, err
 	}
 
 	events := make(chan ThreadEvent)
-	errCh := make(chan error, 1)
-
+	done := make(chan struct{})
+	var runErr error
 	go func() {
+		defer close(done)
 		defer close(events)
-		stdout := stream.Stdout()
-		defer stdout.Close()
-		defer func() {
-			_ = schemaFile.Cleanup()
-		}()
-
-		reader := bufio.NewReader(stdout)
-		var runErr error
-
-		for {
-			if ctxErr := ctx.Err(); ctxErr != nil {
-				runErr = ctxErr
-				break
+		defer cancel()
+		defer schemaFile.Cleanup()
+		for event, err := range EventStream(runCtx, stream) {
+			if err != nil {
+				runErr = err
+				return
 			}
-
-			line, readErr := reader.ReadBytes('\n')
-			trimmed := bytes.TrimSpace(line)
-			if len(trimmed) > 0 {
-				var event ThreadEvent
-				if err := json.Unmarshal(trimmed, &event); err != nil {
-					runErr = fmt.Errorf("parse codex event: %w", err)
-					break
-				}
-
-				if event.Type == EventTypeThreadStarted && event.ThreadID != "" {
-					t.setID(event.ThreadID)
-				}
-
-				select {
-				case events <- event:
-				case <-ctx.Done():
-					runErr = ctx.Err()
-					break
-				}
+			if event.Type == EventTypeThreadStarted {
+				t.setID(event.ThreadID)
 			}
-
-			if readErr != nil {
-				if errors.Is(readErr, io.EOF) {
-					break
-				}
-				if runErr == nil {
-					runErr = fmt.Errorf("read codex output: %w", readErr)
-				}
-				break
-			}
-
-			if runErr != nil {
-				break
+			select {
+			case events <- *event:
+			case <-runCtx.Done():
+				runErr = runCtx.Err()
+				return
 			}
 		}
-
-		waitErr := stream.Wait()
-		if runErr == nil {
-			runErr = waitErr
-		} else if waitErr != nil && !errors.Is(runErr, waitErr) {
-			runErr = fmt.Errorf("%w; wait error: %v", runErr, waitErr)
-		}
-
-		errCh <- runErr
 	}()
-
 	return &StreamedTurn{
 		Events: events,
-		waitFn: func() error {
-			if err := <-errCh; err != nil {
-				return err
-			}
-			return nil
-		},
+		cancel: cancel,
+		waitFn: func() error { <-done; return runErr },
 	}, nil
 }

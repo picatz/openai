@@ -58,6 +58,10 @@ OPENAI_MODEL='your-local-model' OPENAI_BASE_URL='http://localhost:11434/v1/' ope
 
 Responses support depends on the chosen server. The text/JSON/stream one-shot output flags above apply to Responses operations; the legacy chat and image interfaces retain their existing output behavior.
 
+## Codex Go package
+
+The [`codex` package](codex/README.md) wraps `codex exec --json`, with resumable threads, structured output, cancellation, and forward-compatible events. It requires a separately installed Codex CLI. See the package guide for permission options, compatibility scope, and stream cleanup.
+
 ## Development and verification
 
 ```sh
