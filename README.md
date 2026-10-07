@@ -130,3 +130,28 @@ Transcription defaults to `gpt-transcribe`; speech defaults to `gpt-4o-mini-tts`
 Speech output never overwrites an existing file. A complete owner-readable temporary file is published without replacing another writer's destination; request or write errors remove the temporary data. Binary stdout must be redirected away from a terminal. These commands do not record from a microphone or play audio automatically. Make clear to listeners that generated speech is AI-generated. See [file transcription](https://developers.openai.com/api/docs/guides/speech-to-text) and [text to speech](https://developers.openai.com/api/docs/guides/text-to-speech) for model-specific capabilities.
 
 The tests use in-memory mock HTTP transports and a generated silent WAV fixture. No recording, playback, real API call, or paid-service validation is part of the default tests. GPT-Live is a separate session protocol and is not emulated by combining these file-audio commands.
+
+## Bounded GPT-Live file transport
+
+`openai live` is an explicit, headless file-audio client for the GPT-Live primary WebSocket protocol. It does not open a microphone, play speakers, or use the different Realtime API event protocol.
+
+```sh
+openai live --input-pcm input.pcm --output-pcm reply.pcm \
+  --sample-rate 24000 --duration 30s --listen-after 5s --output json
+```
+
+Input/output are raw mono signed 16-bit little-endian PCM at 16 or 24 kHz, not WAV containers. Convert/resample input beforehand; changing `--sample-rate` does not resample bytes. Input is paced in 20 ms frames. After EOF, the client sends silence for `--listen-after`, then requests a close. The explicit duration limit can cut off a reply; GPT-Live has no output-audio-done event to infer when it is safe to stop listening.
+
+Defaults: `gpt-live-1`, voice `marin`, a `gpt-6-luna` Responses backend with a 1024 output-token cap, a 1-minute session duration (maximum 10 minutes), and 5 seconds after EOF. No backend tools or server recording storage are configured. Voice is billed by duration, with backend model usage charged separately. The transport has 15-second startup/finalization bounds, no automatic reconnect/retry, capped frames/usage metadata, and same-origin-only authentication: redirects are rejected, and non-TLS connections are limited to loopback.
+
+Add `--controls` to read line commands from stdin:
+
+- `mute`: stop forwarding file samples locally and request server mute
+- `unmute`: resume only after the matching server acknowledgment
+- `close`: stop input and finalize the session, then save successful output
+
+Muting input does not stop backend work or assistant speech. Ctrl+C requests graceful finalization but returns cancellation and does not publish the output file. Other errors also discard temporary audio. A successful explicit/EOF/duration close publishes a complete new file without replacing existing data. Microphone capture, playback interruption, and hardware/device integration are later work, not implied by these controls.
+
+Control/transcript/backend events are logged only when `--event-log events.jsonl` selects a new private regular file; audio remains in its selected PCM file. A slow event consumer triggers bounded shutdown rather than blocking the session. An unread stderr pipe cannot block the Live protocol loop. JSON stdout reports whether final usage was confirmed and whether audio was saved. `session.usage.updated` is cumulative, and `session.closed` supplies the final voice duration; backend token usage is kept separately. A socket failure or timeout before `session.closed` is reported as unconfirmed finalization, not successful completion.
+
+Tests cover synthetic PCM, protocol ordering, acknowledged mute/unmute, cancellation/backpressure, final-usage collection, truncation/timeouts, and loopback WebSocket/auth/redirect contracts. Real GPT-Live service behavior, audio quality, microphone access, and playback are untested. See [GPT-Live WebSockets](https://developers.openai.com/api/docs/guides/voice-websockets?api=live) and [session lifecycle](https://developers.openai.com/api/docs/guides/live-conversations).
