@@ -50,6 +50,7 @@ const (
 	CommandExecutionStatusInProgress CommandExecutionStatus = "in_progress"
 	CommandExecutionStatusCompleted  CommandExecutionStatus = "completed"
 	CommandExecutionStatusFailed     CommandExecutionStatus = "failed"
+	CommandExecutionStatusDeclined   CommandExecutionStatus = "declined"
 )
 
 // CommandExecutionItem records a shell command executed by the agent.
@@ -83,8 +84,9 @@ type FileUpdateChange struct {
 type PatchApplyStatus string
 
 const (
-	PatchApplyStatusCompleted PatchApplyStatus = "completed"
-	PatchApplyStatusFailed    PatchApplyStatus = "failed"
+	PatchApplyStatusInProgress PatchApplyStatus = "in_progress"
+	PatchApplyStatusCompleted  PatchApplyStatus = "completed"
+	PatchApplyStatusFailed     PatchApplyStatus = "failed"
 )
 
 // FileChangeItem aggregates a set of file modifications.
@@ -108,11 +110,22 @@ const (
 
 // McpToolCallItem represents an MCP tool call.
 type McpToolCallItem struct {
-	ID     string            `json:"id"`
-	Type   ItemType          `json:"type"`
-	Server string            `json:"server"`
-	Tool   string            `json:"tool"`
-	Status McpToolCallStatus `json:"status"`
+	ID        string             `json:"id"`
+	Type      ItemType           `json:"type"`
+	Server    string             `json:"server"`
+	Tool      string             `json:"tool"`
+	Status    McpToolCallStatus  `json:"status"`
+	Arguments json.RawMessage    `json:"arguments,omitempty"`
+	Result    *McpToolCallResult `json:"result,omitempty"`
+	Error     *ThreadError       `json:"error,omitempty"`
+}
+
+// McpToolCallResult keeps content blocks and arbitrary JSON values losslessly
+// without coupling this package to a specific MCP SDK version.
+type McpToolCallResult struct {
+	Content           []json.RawMessage `json:"content"`
+	Meta              json.RawMessage   `json:"_meta,omitempty"`
+	StructuredContent json.RawMessage   `json:"structured_content,omitempty"`
 }
 
 func (i *McpToolCallItem) ItemType() ItemType { return ItemTypeMcpToolCall }
@@ -122,6 +135,9 @@ type WebSearchItem struct {
 	ID    string   `json:"id"`
 	Type  ItemType `json:"type"`
 	Query string   `json:"query"`
+	// Action and Results retain upstream web-search payloads without narrowing their schema.
+	Action  json.RawMessage   `json:"action,omitempty"`
+	Results []json.RawMessage `json:"results,omitempty"`
 }
 
 func (i *WebSearchItem) ItemType() ItemType { return ItemTypeWebSearch }
@@ -159,6 +175,16 @@ type UnknownThreadItem struct {
 }
 
 func (i *UnknownThreadItem) ItemType() ItemType { return ItemTypeUnknown }
+
+// MarshalJSON preserves the entire payload of an unrecognized item.
+func (i UnknownThreadItem) MarshalJSON() ([]byte, error) {
+	if len(i.Raw) != 0 {
+		return i.Raw, nil
+	}
+	return json.Marshal(struct {
+		Type ItemType `json:"type"`
+	}{i.Type})
+}
 
 // UnmarshalThreadItem decodes a thread item into the corresponding Go type.
 func UnmarshalThreadItem(data []byte) (ThreadItem, error) {
@@ -221,6 +247,6 @@ func UnmarshalThreadItem(data []byte) (ThreadItem, error) {
 	case "":
 		return nil, fmt.Errorf("thread item missing type discriminator")
 	default:
-		return &UnknownThreadItem{Type: discriminator.Type, Raw: json.RawMessage(data)}, nil
+		return &UnknownThreadItem{Type: discriminator.Type, Raw: append(json.RawMessage(nil), data...)}, nil
 	}
 }

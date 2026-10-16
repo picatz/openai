@@ -1,0 +1,9 @@
+{"type":"thread.started","thread_id":"fixture-thread"}
+{"type":"turn.started"}
+{"type":"item.started","item":{"id":"m1","type":"mcp_tool_call","server":"fixture","tool":"synthetic","arguments":{"value":9007199254740993},"result":null,"error":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"m1","type":"mcp_tool_call","server":"fixture","tool":"synthetic","arguments":{},"result":{"content":[{"type":"text","text":"fixture"}],"structured_content":{"answer":42},"_meta":{"fixture":true}},"error":null,"status":"completed"}}
+{"type":"item.completed","item":{"id":"c1","type":"command_execution","command":"synthetic-only","aggregated_output":"","exit_code":null,"status":"declined"}}
+{"type":"item.completed","item":{"id":"w1","type":"web_search","query":"synthetic-only","action":{"type":"search","queries":["synthetic-only"]},"results":[{"title":"fixture","url":"https://example.invalid"}]}}
+{"type":"item.completed","item":{"id":"a1","type":"collab_tool_call","tool":"spawn_agent","sender_thread_id":"fixture-thread","receiver_thread_ids":["fixture-agent"],"prompt":null,"agents_states":{"fixture-agent":{"status":"completed","message":"fixture"}},"status":"completed"}}
+{"type":"item.completed","item":{"id":"f1","type":"agent_message","text":"{\"answer\":42}"}}
+{"type":"turn.completed","usage":{"input_tokens":10,"cached_input_tokens":3,"cache_write_input_tokens":2,"output_tokens":5,"reasoning_output_tokens":1}}
