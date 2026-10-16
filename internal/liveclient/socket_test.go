@@ -2,11 +2,13 @@ package liveclient
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/picatz/websocket"
 )
@@ -63,5 +65,29 @@ func TestLiveEndpointValidation(t *testing.T) {
 	endpoint, err := Endpoint("")
 	if err != nil || endpoint != "wss://api.openai.com/v1/live/sessions" || strings.Contains(endpoint, "?") {
 		t.Fatalf("endpoint=%q err=%v", endpoint, err)
+	}
+}
+func TestWebSocketReadHonorsContext(t *testing.T) {
+	release := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		c, err := websocket.Upgrade(w, r)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		defer c.Close()
+		<-release // never send an event
+	}))
+	defer server.Close()
+	defer close(release)
+	socket, err := Dial(t.Context(), ConnectionConfig{BaseURL: server.URL + "/v1/"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer socket.Close()
+	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+	defer cancel()
+	if _, err := socket.Read(ctx); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("err = %v, want context.DeadlineExceeded", err)
 	}
 }

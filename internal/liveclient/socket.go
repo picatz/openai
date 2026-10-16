@@ -12,9 +12,9 @@ import (
 	"github.com/picatz/websocket"
 )
 
-// ConnectionConfig configures the Live WebSocket connection. The handshake
-// is performed by the WebSocket package directly, so it never follows
-// redirects and never consults HTTP proxy environment variables.
+// ConnectionConfig configures the Live WebSocket connection. Dial honors
+// HTTP_PROXY, HTTPS_PROXY and NO_PROXY, tunnelling through the proxy so the
+// WebSocket handshake and TLS stay end to end, and never follows redirects.
 type ConnectionConfig struct {
 	BaseURL, APIKey, Organization, Project string
 }
@@ -60,7 +60,10 @@ func Dial(ctx context.Context, cfg ConnectionConfig) (Socket, error) {
 	}
 	dialCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	conn, _, err := websocket.Dial(dialCtx, endpoint, websocket.WithHeader(header), websocket.WithMaxMessageSize(1<<20))
+	conn, _, err := websocket.Dial(dialCtx, endpoint,
+		websocket.WithHeader(header),
+		websocket.WithMaxMessageSize(1<<20),
+		websocket.WithProxy(http.ProxyFromEnvironment))
 	if err != nil {
 		return nil, fmt.Errorf("connect Live: %w", err)
 	}
@@ -69,22 +72,11 @@ func Dial(ctx context.Context, cfg ConnectionConfig) (Socket, error) {
 
 type socket struct{ conn *websocket.Conn }
 
-// expired is a deadline in the past, used to interrupt blocked I/O when a
-// context ends. The WebSocket package does not take contexts after Dial, and
-// timeouts are terminal for the connection, which callers close afterwards.
-var expired = time.Unix(1, 0)
-
+// Read and Write abort the connection if ctx ends mid-call; Run closes the
+// socket on cancellation anyway, so this matches its lifecycle.
 func (s *socket) Read(ctx context.Context) ([]byte, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	stop := context.AfterFunc(ctx, func() { s.conn.SetDeadline(expired) })
-	kind, data, err := s.conn.ReadMessage()
-	stop()
+	kind, data, err := s.conn.ReadMessageContext(ctx)
 	if err != nil {
-		if ctxErr := ctx.Err(); ctxErr != nil {
-			return nil, ctxErr
-		}
 		return nil, err
 	}
 	if kind != websocket.TextMessage {
@@ -93,21 +85,6 @@ func (s *socket) Read(ctx context.Context) ([]byte, error) {
 	return data, nil
 }
 func (s *socket) Write(ctx context.Context, data []byte) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	deadline, _ := ctx.Deadline() // zero when unset, which clears the deadline
-	if err := s.conn.SetWriteDeadline(deadline); err != nil {
-		return err
-	}
-	stop := context.AfterFunc(ctx, func() { s.conn.SetWriteDeadline(expired) })
-	err := s.conn.WriteMessage(websocket.TextMessage, data)
-	stop()
-	if err != nil {
-		if ctxErr := ctx.Err(); ctxErr != nil {
-			return ctxErr
-		}
-	}
-	return err
+	return s.conn.WriteMessageContext(ctx, websocket.TextMessage, data)
 }
 func (s *socket) Close() error { return s.conn.Close() }
