@@ -71,8 +71,7 @@ func (app *application) runTUI(cmd *cobra.Command, api conversation.API) error {
 	}
 	ctx, cancel := context.WithCancel(cmd.Context())
 	defer cancel()
-	model := tui.New(tui.Config{Context: ctx, Backend: app.backend(), Session: session, Store: store, WebSearch: app.webSearch})
-	_, err = tea.NewProgram(model, tea.WithContext(ctx), tea.WithInput(in), tea.WithOutput(out), tea.WithoutSignalHandler()).Run()
+	err = tui.Run(tui.Config{Context: ctx, Backend: app.backend(), Session: session, Store: store, WebSearch: app.webSearch}, tea.WithInput(in), tea.WithOutput(out), tea.WithoutSignalHandler())
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
