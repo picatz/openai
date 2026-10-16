@@ -33,6 +33,7 @@ func TestRequestValidate(t *testing.T) {
 		{"missing question instructions", Request{Model: "m", Input: "in", Questions: []Question{{Type: "predicate", Name: "q", Instructions: ""}}}, "question name and instructions are required"},
 		{"duplicate question name", Request{Model: "m", Input: "in", Questions: []Question{predicate, predicate}}, "duplicate question name"},
 		{"predicate with choices", Request{Model: "m", Input: "in", Questions: []Question{{Type: "predicate", Name: "q", Instructions: "x", Choices: []Choice{{Value: "a", Description: "b"}}}}}, "predicate questions do not take choices or levels"},
+		{"predicate with levels", Request{Model: "m", Input: "in", Questions: []Question{{Type: "predicate", Name: "q", Instructions: "x", Levels: score.Levels}}}, "predicate questions do not take choices or levels"},
 		{"choice too few", Request{Model: "m", Input: "in", Questions: []Question{{Type: "choice", Name: "q", Instructions: "x", Choices: []Choice{{Value: "a", Description: "b"}}}}}, "choice questions require at least two choices"},
 		{"choice with levels", Request{Model: "m", Input: "in", Questions: []Question{{Type: "choice", Name: "q", Instructions: "x", Choices: choice.Choices, Levels: score.Levels}}}, "choice questions require at least two choices"},
 		{"choice duplicate value", Request{Model: "m", Input: "in", Questions: []Question{{Type: "choice", Name: "q", Instructions: "x", Choices: []Choice{
