@@ -77,7 +77,7 @@ type socket struct{ conn *websocket.Conn }
 // Read and Write abort the connection if ctx ends mid-call; Run closes the
 // socket on cancellation anyway, so this matches its lifecycle.
 func (s *socket) Read(ctx context.Context) ([]byte, error) {
-	kind, data, err := s.conn.ReadMessageContext(ctx)
+	kind, data, err := s.conn.ReadMessage(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -87,6 +87,6 @@ func (s *socket) Read(ctx context.Context) ([]byte, error) {
 	return data, nil
 }
 func (s *socket) Write(ctx context.Context, data []byte) error {
-	return s.conn.WriteMessageContext(ctx, websocket.TextMessage, data)
+	return s.conn.WriteMessage(ctx, websocket.TextMessage, data)
 }
 func (s *socket) Close() error { return s.conn.Close() }

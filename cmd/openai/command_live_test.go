@@ -31,14 +31,14 @@ func liveFixtureServer(t *testing.T) *httptest.Server {
 		}
 		defer socket.Close()
 		send := func(s string) {
-			if err := socket.WriteMessage(websocket.TextMessage, []byte(s)); err != nil {
+			if err := socket.WriteMessage(r.Context(), websocket.TextMessage, []byte(s)); err != nil {
 				t.Error(err)
 			}
 		}
 		first := true
 		sentAudio := false
 		for {
-			_, data, err := socket.ReadMessage()
+			_, data, err := socket.ReadMessage(r.Context())
 			if err != nil {
 				return
 			}
