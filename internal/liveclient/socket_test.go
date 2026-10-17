@@ -24,12 +24,12 @@ func TestWebSocketHandshakeContract(t *testing.T) {
 			return
 		}
 		defer c.Close()
-		kind, data, err := c.ReadMessage()
+		kind, data, err := c.ReadMessage(r.Context())
 		if err != nil {
 			t.Error(err)
 			return
 		}
-		c.WriteMessage(kind, data)
+		c.WriteMessage(r.Context(), kind, data)
 	}))
 	defer server.Close()
 	socket, err := Dial(t.Context(), ConnectionConfig{BaseURL: server.URL + "/v1/", APIKey: "synthetic"})
