@@ -14,7 +14,7 @@ require (
 	github.com/go-git/go-git/v5 v5.19.3
 	github.com/muesli/cancelreader v0.2.2
 	github.com/openai/openai-go/v3 v3.71.2
-	github.com/picatz/websocket v0.0.0-20261017171817-f17c1394198d
+	github.com/picatz/websocket v0.0.0-20261017183535-e8ed1d33277a
 	github.com/segmentio/ksuid v1.0.4
 	github.com/shoenig/test v1.12.1
 	github.com/spf13/cobra v1.9.1
