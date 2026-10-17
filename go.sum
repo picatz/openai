@@ -162,6 +162,8 @@ github.com/openai/openai-go/v3 v3.71.2 h1:syc1zjR3BWyyz0D58u+YzRJ+y11eOjfWzQ8HQV
 github.com/openai/openai-go/v3 v3.71.2/go.mod h1:+dSPa+nbX+dNoXg1jecMnVpgRP+E/5IBA6Jiz9Pc8WM=
 github.com/picatz/websocket v0.0.0-20261016031137-2cdcc297f941 h1:4Qmdim/G4FBdE5PVpGCQW4nOzOJafHmlVUbXrsdZtn4=
 github.com/picatz/websocket v0.0.0-20261016031137-2cdcc297f941/go.mod h1:mfnhKK4o4W18NOzQsLLplCb9OG/kWYWQeOs6xKf6GL4=
+github.com/picatz/websocket v0.0.0-20261017040411-45ce5595f136 h1:3eTU39fRRgK0o93mggrMl2J4FUy8tc6YE3n8h6Yio0k=
+github.com/picatz/websocket v0.0.0-20261017040411-45ce5595f136/go.mod h1:mfnhKK4o4W18NOzQsLLplCb9OG/kWYWQeOs6xKf6GL4=
 github.com/pingcap/errors v0.11.4 h1:lFuQV/oaUMGcD2tqt+01ROSmJs75VG1ToEOkZIZ4nE4=
 github.com/pingcap/errors v0.11.4/go.mod h1:Oi8TUi2kEtXXLMJk9l1cGmz20kV3TaQ0usTwv5KuLY8=
 github.com/pjbgf/sha1cd v0.7.0 h1:ZRNPKHj+gfkLBf0KJv/p1Hmz+7bqCT5o311YX0nq+DA=

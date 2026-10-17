@@ -60,10 +60,12 @@ func Dial(ctx context.Context, cfg ConnectionConfig) (Socket, error) {
 	}
 	dialCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	conn, _, err := websocket.Dial(dialCtx, endpoint,
-		websocket.WithHeader(header),
-		websocket.WithMaxMessageSize(1<<20),
-		websocket.WithProxy(http.ProxyFromEnvironment))
+	dialer := &websocket.Dialer{
+		Header:         header,
+		MaxMessageSize: 1 << 20,
+		Proxy:          http.ProxyFromEnvironment,
+	}
+	conn, _, err := dialer.Dial(dialCtx, endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("connect Live: %w", err)
 	}
