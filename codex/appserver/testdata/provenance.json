@@ -1,0 +1,72 @@
+{
+  "upstream_commit": "83086188ae0614bd882818ff1aa23f3194962012",
+  "upstream_tag": "rust-v0.163.0",
+  "fixture_sha256": "ebad4db1c5ae46e349fb3d4bf900c397ddce2dd304aba17dbb710f829d6d9227",
+  "sources": [
+    {
+      "path": "codex-rs/app-server-protocol/src/rpc.rs",
+      "url": "https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/app-server-protocol/src/rpc.rs",
+      "sha256": "ee8c5b9d4ed3fa3375d67833f442e4f5a976a5eac7b7236d18ba942bb53a2686"
+    },
+    {
+      "path": "codex-rs/app-server-protocol/src/protocol/v1.rs",
+      "url": "https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/app-server-protocol/src/protocol/v1.rs",
+      "sha256": "eadd9fc4b358918739237ff0bda5a12fd19a33af68a15e6d5b85ed6021937e36"
+    },
+    {
+      "path": "codex-rs/app-server-transport/src/transport/stdio.rs",
+      "url": "https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/app-server-transport/src/transport/stdio.rs",
+      "sha256": "03e1d2681a06cdcbfa81d62d01bd737b6575c9d3f1be17a31eadc546e57bc7ab"
+    },
+    {
+      "path": "codex-rs/app-server-client/src/server_request.rs",
+      "url": "https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/app-server-client/src/server_request.rs",
+      "sha256": "a54ed48e8dea917bbca2618b9f9d8538bdfd919e90a4bd81fbbf2aa29804b7f2"
+    },
+    {
+      "path": "codex-rs/app-server-client/src/remote.rs",
+      "url": "https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/app-server-client/src/remote.rs",
+      "sha256": "d5c47be3573bc3559fb410a33ac22da5e4a0168232f4a86663ea45a246683274"
+    },
+    {
+      "path": "codex-rs/app-server/src/outgoing_message.rs",
+      "url": "https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/app-server/src/outgoing_message.rs",
+      "sha256": "a7632fe82d97125a999e2dd438d8ffaf43a57a98dca0dacb072b4224599ff2a1"
+    },
+    {
+      "path": "codex-rs/app-server-protocol/schema/json/JSONRPCMessage.json",
+      "url": "https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/app-server-protocol/schema/json/JSONRPCMessage.json",
+      "sha256": "1321400ef0faaeb24c57edbe93d892358e2b81cd0ae233fa0baeb32e49392f38"
+    },
+    {
+      "path": "codex-rs/app-server-protocol/schema/json/v1/InitializeParams.json",
+      "url": "https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/app-server-protocol/schema/json/v1/InitializeParams.json",
+      "sha256": "71d400afa8e843b0a567167848e384fa316523774168cb24734b7b2adb52c961"
+    },
+    {
+      "path": "codex-rs/app-server-protocol/schema/json/v1/InitializeResponse.json",
+      "url": "https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/app-server-protocol/schema/json/v1/InitializeResponse.json",
+      "sha256": "5ad5e3fdc499d12175f8c7b72d6ee93b267069d00c49e99373380d751d1bc234"
+    },
+    {
+      "path": "codex-rs/app-server-protocol/schema/json/ServerNotification.json",
+      "url": "https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/app-server-protocol/schema/json/ServerNotification.json",
+      "sha256": "91d4891806215105440dbbb81d43f5b18a19e2949caf0bcd824241c63d086360"
+    },
+    {
+      "path": "codex-rs/app-server-protocol/schema/json/ServerRequest.json",
+      "url": "https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/app-server-protocol/schema/json/ServerRequest.json",
+      "sha256": "493b1edde8c056e6e5d622d04780222c44e7848456a080d5585c34ae0c8fc78e"
+    },
+    {
+      "path": "codex-rs/app-server-protocol/schema/json/v2/ServerRequestResolvedNotification.json",
+      "url": "https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/app-server-protocol/schema/json/v2/ServerRequestResolvedNotification.json",
+      "sha256": "60ac5cfa626515ceee856d9cf705bf7c81b293d31c4b7b9a5caac7648ee19440"
+    },
+    {
+      "path": "codex-rs/app-server-protocol/schema/json/ClientNotification.json",
+      "url": "https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/app-server-protocol/schema/json/ClientNotification.json",
+      "sha256": "f36c3cc912cb67c5f2543a3c8898d9b5e06be15782d9f34f2920b321b7601537"
+    }
+  ]
+}

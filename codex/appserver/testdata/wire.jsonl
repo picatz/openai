@@ -1,0 +1,13 @@
+{"id":"go:1","method":"initialize","params":{"clientInfo":{"name":"picatz_openai","title":"OpenAI Go CLI","version":"0.1.0"}}}
+{"id":"go:1","result":{"userAgent":"codex_cli_rs/0.163.0 (Linux 6.0; x86_64) picatz_openai; 0.1.0","codexHome":"/synthetic/codex-home","platformFamily":"unix","platformOs":"linux"}}
+{"method":"initialized"}
+{"method":"item/agentMessage/delta","params":{"threadId":"thread-fixture","turnId":"turn-fixture","itemId":"message-fixture","delta":"Hello"},"emittedAtMs":123456789}
+{"id":"go:2","result":null}
+{"id":"go:3","error":{"code":-32600,"message":"Server is shutting down","data":{"reason":"serverShuttingDown","futureField":true}}}
+{"id":9223372036854775807,"method":"item/commandExecution/requestApproval","params":{"threadId":"thread-fixture","turnId":"turn-fixture","itemId":"command-fixture","startedAtMs":123456789,"command":"echo fixture","cwd":"/synthetic/workspace"}}
+{"id":"approval-fixture","method":"item/fileChange/requestApproval","params":{"threadId":"thread-fixture","turnId":"turn-fixture","itemId":"patch-fixture","startedAtMs":123456789}}
+{"id":-1,"method":"item/tool/call","params":{"threadId":"thread-fixture","turnId":"turn-fixture","callId":"tool-fixture","tool":"synthetic_only","arguments":{"value":1}}}
+{"id":-1,"error":{"code":-32601,"message":"Unsupported server request"}}
+{"method":"serverRequest/resolved","params":{"threadId":"thread-fixture","requestId":"approval-fixture"}}
+{"method":"future/event","params":{"future":true},"futureEnvelope":1}
+{"method":"future/request","id":"future-id","params":{"future":true}}
