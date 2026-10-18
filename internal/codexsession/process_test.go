@@ -325,7 +325,9 @@ func TestProcessStartupFailureClosesAssignedFiles(t *testing.T) {
 		if !ok {
 			t.Fatalf("%s was not a direct file", name)
 		}
-		if _, err := file.Stat(); !errors.Is(err, os.ErrClosed) {
+		// Stat on a closed Windows handle reports ERROR_INVALID_HANDLE.
+		// A second Close consistently identifies an already-closed os.File.
+		if err := file.Close(); !errors.Is(err, os.ErrClosed) {
 			t.Errorf("failed start retained %s: %v", name, err)
 		}
 	}
