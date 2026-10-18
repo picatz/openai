@@ -35,14 +35,14 @@ One-shot creation sets `store: false`. Retrieval/deletion requires an existing r
 
 ## Configuration
 
-All commands use the same SDK client configuration:
+HTTP API commands use the SDK client configuration below. Live uses a separate WebSocket client with its own model and session settings.
 
 - `OPENAI_API_KEY`: API authentication
 - `OPENAI_MODEL` or `--model`: text model (default `gpt-4o`, retained for compatibility)
 - `OPENAI_BASE_URL` or `--base-url`: alternate API base URL
 - `OPENAI_API_URL`: supported legacy base URL alias, only used when `OPENAI_BASE_URL` is absent
 - `OPENAI_ORG_ID` and `OPENAI_PROJECT_ID`: SDK organization/project options
-- `--timeout`: per-request timeout (default `2m`; `0` disables it)
+- `--timeout`: HTTP API request timeout (default `2m`; `0` disables it). Live uses `--duration` instead.
 
 Flags take precedence over environment variables. The image command has its own image-model flag. `--help` and shell completion do not require credentials.
 
@@ -138,6 +138,8 @@ The tests use in-memory mock HTTP transports and a generated silent WAV fixture.
 ## Bounded GPT-Live file transport
 
 `openai live` is an explicit, headless file-audio client for the GPT-Live primary WebSocket protocol. It does not open a microphone, play speakers, or use the different Realtime API event protocol.
+
+Live accepts the shared API key, organization, project, and base URL configuration, plus `--output`/`-o` for its final report. Its local `--model` selects the Live voice model rather than the text model. Use `--duration` to limit the session; the HTTP-only `--timeout` flag does not apply. Explicitly supplying `--timeout`, `--legacy`, `--temporary`/`-t`, `--history-dir`, or `--session` is an error, even with an empty, false, or default value. Live does not use local chat history. Keep `--stream` and `--web-search` disabled.
 
 ```sh
 openai live --input-pcm input.pcm --output-pcm reply.pcm \

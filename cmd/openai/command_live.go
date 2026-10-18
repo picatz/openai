@@ -35,7 +35,7 @@ func newLiveCommand(app *application) *cobra.Command {
 	var rate, backendMaxTokens int
 	var duration, listenAfter time.Duration
 	var controls bool
-	cmd := &cobra.Command{Use: "live", Short: "Run a bounded GPT-Live session with explicit PCM files", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
+	cmd := &cobra.Command{Use: "live", Short: "Run a bounded GPT-Live session with explicit PCM files", Args: validateLiveArgs, RunE: func(cmd *cobra.Command, args []string) error {
 		if app.webSearch {
 			return fmt.Errorf("web-search tools are not configured in this bounded Live client")
 		}
@@ -199,6 +199,11 @@ func newLiveCommand(app *application) *cobra.Command {
 		}
 		return errors.Join(runErr, printErr)
 	}}
+	cmd.Long = `Run a bounded GPT-Live session with explicit PCM files.
+
+Use --duration to limit the Live session. Startup and finalization have separate
+15-second bounds. Inherited --timeout, --legacy, --temporary/-t, --history-dir,
+and --session are not supported. --stream and --web-search must remain disabled.`
 	cmd.Flags().StringVar(&inputPath, "input-pcm", "", "Raw mono PCM16 input file (not WAV)")
 	cmd.Flags().StringVar(&outputPath, "output-pcm", "", "New file for returned raw PCM16 audio")
 	cmd.Flags().StringVar(&model, "model", "gpt-live-1", "Live voice model")
@@ -214,6 +219,23 @@ func newLiveCommand(app *application) *cobra.Command {
 	cmd.MarkFlagRequired("input-pcm")
 	cmd.MarkFlagRequired("output-pcm")
 	return cmd
+}
+
+func validateLiveArgs(cmd *cobra.Command, args []string) error {
+	if err := cobra.NoArgs(cmd, args); err != nil {
+		return err
+	}
+	// Args validation runs before the root's PersistentPreRunE so unrelated
+	// chat-session checks cannot obscure these Live-specific flag errors.
+	for _, name := range []string{"legacy", "temporary", "history-dir", "session"} {
+		if cmd.Flags().Changed(name) {
+			return fmt.Errorf("--%s is not supported by live; omit this flag", name)
+		}
+	}
+	if cmd.Flags().Changed("timeout") {
+		return fmt.Errorf("--timeout applies to HTTP API requests; use --duration to limit the Live session")
+	}
+	return nil
 }
 
 func liveControls(ctx context.Context, input io.Reader, diagnostics io.Writer) (<-chan liveclient.Command, func(), error) {
