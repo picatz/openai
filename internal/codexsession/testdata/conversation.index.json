@@ -1,0 +1,233 @@
+[
+  {
+    "line": 1,
+    "direction": "client",
+    "description": "initialize request",
+    "schema": "InitializeParams",
+    "key": "params"
+  },
+  {
+    "line": 2,
+    "direction": "server",
+    "description": "InitializeResponse result",
+    "schema": "InitializeResponse",
+    "key": "result"
+  },
+  {
+    "line": 3,
+    "direction": "client",
+    "description": "initialized notification",
+    "schema": "ClientNotification",
+    "key": null
+  },
+  {
+    "line": 4,
+    "direction": "client",
+    "description": "thread/start request",
+    "schema": "ThreadStartParams",
+    "key": "params"
+  },
+  {
+    "line": 5,
+    "direction": "server",
+    "description": "ThreadStartResponse result",
+    "schema": "ThreadStartResponse",
+    "key": "result"
+  },
+  {
+    "line": 6,
+    "direction": "server",
+    "description": "thread/started notification",
+    "schema": "ServerNotification",
+    "key": null
+  },
+  {
+    "line": 7,
+    "direction": "client",
+    "description": "turn/start request",
+    "schema": "TurnStartParams",
+    "key": "params"
+  },
+  {
+    "line": 8,
+    "direction": "server",
+    "description": "turn/started notification",
+    "schema": "ServerNotification",
+    "key": null
+  },
+  {
+    "line": 9,
+    "direction": "server",
+    "description": "TurnStartResponse result",
+    "schema": "TurnStartResponse",
+    "key": "result"
+  },
+  {
+    "line": 10,
+    "direction": "server",
+    "description": "turn/plan/updated notification",
+    "schema": "ServerNotification",
+    "key": null
+  },
+  {
+    "line": 11,
+    "direction": "server",
+    "description": "item/started notification",
+    "schema": "ServerNotification",
+    "key": null
+  },
+  {
+    "line": 12,
+    "direction": "server",
+    "description": "item/fileChange/patchUpdated notification",
+    "schema": "ServerNotification",
+    "key": null
+  },
+  {
+    "line": 13,
+    "direction": "server",
+    "description": "item/completed notification",
+    "schema": "ServerNotification",
+    "key": null
+  },
+  {
+    "line": 14,
+    "direction": "server",
+    "description": "turn/diff/updated notification",
+    "schema": "ServerNotification",
+    "key": null
+  },
+  {
+    "line": 15,
+    "direction": "server",
+    "description": "item/started notification",
+    "schema": "ServerNotification",
+    "key": null
+  },
+  {
+    "line": 16,
+    "direction": "server",
+    "description": "item/commandExecution/outputDelta notification",
+    "schema": "ServerNotification",
+    "key": null
+  },
+  {
+    "line": 17,
+    "direction": "server",
+    "description": "item/commandExecution/outputDelta notification",
+    "schema": "ServerNotification",
+    "key": null
+  },
+  {
+    "line": 18,
+    "direction": "server",
+    "description": "item/completed notification",
+    "schema": "ServerNotification",
+    "key": null
+  },
+  {
+    "line": 19,
+    "direction": "server",
+    "description": "turn/plan/updated notification",
+    "schema": "ServerNotification",
+    "key": null
+  },
+  {
+    "line": 20,
+    "direction": "server",
+    "description": "item/started notification",
+    "schema": "ServerNotification",
+    "key": null
+  },
+  {
+    "line": 21,
+    "direction": "server",
+    "description": "item/agentMessage/delta notification",
+    "schema": "ServerNotification",
+    "key": null
+  },
+  {
+    "line": 22,
+    "direction": "server",
+    "description": "item/agentMessage/delta notification",
+    "schema": "ServerNotification",
+    "key": null
+  },
+  {
+    "line": 23,
+    "direction": "server",
+    "description": "item/completed notification",
+    "schema": "ServerNotification",
+    "key": null
+  },
+  {
+    "line": 24,
+    "direction": "server",
+    "description": "turn/completed notification",
+    "schema": "ServerNotification",
+    "key": null
+  },
+  {
+    "line": 25,
+    "direction": "client",
+    "description": "turn/start request",
+    "schema": "TurnStartParams",
+    "key": "params"
+  },
+  {
+    "line": 26,
+    "direction": "server",
+    "description": "TurnStartResponse result",
+    "schema": "TurnStartResponse",
+    "key": "result"
+  },
+  {
+    "line": 27,
+    "direction": "server",
+    "description": "turn/started notification",
+    "schema": "ServerNotification",
+    "key": null
+  },
+  {
+    "line": 28,
+    "direction": "server",
+    "description": "item/started notification",
+    "schema": "ServerNotification",
+    "key": null
+  },
+  {
+    "line": 29,
+    "direction": "server",
+    "description": "item/commandExecution/outputDelta notification",
+    "schema": "ServerNotification",
+    "key": null
+  },
+  {
+    "line": 30,
+    "direction": "client",
+    "description": "turn/interrupt request",
+    "schema": "TurnInterruptParams",
+    "key": "params"
+  },
+  {
+    "line": 31,
+    "direction": "server",
+    "description": "item/completed notification",
+    "schema": "ServerNotification",
+    "key": null
+  },
+  {
+    "line": 32,
+    "direction": "server",
+    "description": "TurnInterruptResponse result",
+    "schema": "TurnInterruptResponse",
+    "key": "result"
+  },
+  {
+    "line": 33,
+    "direction": "server",
+    "description": "turn/completed notification",
+    "schema": "ServerNotification",
+    "key": null
+  }
+]
