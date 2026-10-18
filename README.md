@@ -146,6 +146,15 @@ openai live --input-pcm input.pcm --output-pcm reply.pcm \
   --sample-rate 24000 --duration 30s --listen-after 5s --output json
 ```
 
+Before starting a session, add `--check` to inspect the same explicit paths and configuration offline:
+
+```sh
+openai live --check --input-pcm input.pcm --output-pcm reply.pcm \
+  --sample-rate 24000 --duration 30s --listen-after 5s --output json
+```
+
+This requires no credentials and makes no network connection. It reads only the selected regular input file's metadata and at most 12 header bytes, rejects the same invalid configuration and obvious WAV/size/sample-boundary errors as a normal run, and checks that output/log paths are new with existing parent directories. It creates no files and does not read `--controls` input. Both PCM paths remain required; omit `--check` to start the session. Text and JSON reports describe the selected settings and explicitly leave credentials, service/model/voice availability, output write permissions, and hardware unverified. Raw PCM's actual encoding, channels, sample rate, and audio quality cannot be inferred from these checks; the format is an assumption, and `--sample-rate` does not resample the input. Successful checks do not guarantee that a later session or file write will succeed.
+
 Input/output are raw mono signed 16-bit little-endian PCM at 16 or 24 kHz, not WAV containers. Convert/resample input beforehand; changing `--sample-rate` does not resample bytes. Input is paced in 20 ms frames. After EOF, the client sends silence for `--listen-after`, then requests a close. The explicit duration limit can cut off a reply; GPT-Live has no output-audio-done event to infer when it is safe to stop listening.
 
 Defaults: `gpt-live-1`, voice `marin`, a `gpt-6-luna` Responses backend with a 1024 output-token cap, a 1-minute session duration (maximum 10 minutes), and 5 seconds after EOF. No backend tools or server recording storage are configured. Voice is billed by duration, with backend model usage charged separately. The transport has 15-second startup/finalization bounds, no automatic reconnect/retry, capped frames/usage metadata, and same-origin-only authentication: redirects are rejected, and non-TLS connections are limited to loopback.
