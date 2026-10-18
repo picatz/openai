@@ -1,0 +1,16 @@
+  [1;35mopenai codex[m  /  WORKSPACE PREVIEW    
+  ~/work/openai  ·  fixture model       
+  ────────────────────────────────────  
+  [1;35mFILES[m  [32m[completed][m                    
+  Workspace presentation                
+                                        
+  update  internal/codextui/view.go     
+  add  internal/codextui/model_test.go  
+                                        
+  DIFF · supplied snapshot              
+  [31m--- a/internal/codextui/view.go[m       
+  [32m+++ b/internal/codextui/view.go[m       
+  ────────────────────────────────────  
+  Item 4/5 · Focus: items · running     
+  DISPLAY ONLY · no agent connection    
+  ↑/↓ · ? help · Ctrl+Q quit            
