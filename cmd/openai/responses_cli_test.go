@@ -19,6 +19,10 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	if os.Getenv("OPENAI_CODEX_EXEC_HELPER") == "1" && len(os.Args) > 1 && os.Args[1] == "exec" {
+		runCodexExecTestHelper()
+		os.Exit(0)
+	}
 	if os.Getenv("OPENAI_CLI_PTY_HELPER") == "1" {
 		os.Args = []string{"openai", "--legacy"}
 		if os.Getenv("OPENAI_CLI_PTY_MODE") == "tui" {

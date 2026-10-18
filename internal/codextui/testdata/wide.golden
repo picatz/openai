@@ -1,0 +1,32 @@
+  [1;35mopenai codex[m  /  WORKSPACE PREVIEW                                                                                    
+  ~/work/openai  ·  fixture model                                                                                       
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
+    A focused plan for this change         │ [1;35mFILES[m  [32m[completed][m                                                         
+    message [32m[completed][m                    │ Workspace presentation                                                     
+    Build the workspace view               │                                                                            
+    plan [1;35m[running][m                         │ update  internal/codextui/view.go                                          
+    go test ./internal/codextui            │ add  internal/codextui/model_test.go                                       
+    command [32m[completed][m                    │                                                                            
+  [1;35m> Workspace presentation[m                 │ DIFF · supplied snapshot                                                   
+    files [32m[completed][m                      │ [31m--- a/internal/codextui/view.go[m                                            
+    repository · inspect_tree              │ [32m+++ b/internal/codextui/view.go[m                                            
+    tool [32m[completed][m                       │ [1;35m@@ -1,3 +1,4 @@[m                                                            
+                                           │  package codextui                                                          
+                                           │ [31m-// Text-only transcript.[m                                                  
+                                           │ [32m+// Responsive workspace view.[m                                             
+                                           │ [32m+// Keyboard-first, with honest capabilities.[m                              
+                                           │                                                                            
+                                           │                                                                            
+                                           │                                                                            
+                                           │                                                                            
+                                           │                                                                            
+                                           │                                                                            
+                                           │                                                                            
+                                           │                                                                            
+                                           │                                                                            
+                                           │                                                                            
+                                           │                                                                            
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
+  Item 4/5 · Focus: items · running                                                                                     
+  DISPLAY ONLY · no agent connection                                                                                    
+  ↑/↓ items · Tab focus · PgUp/PgDn scroll · ? help · Ctrl+Q quit                                                       
