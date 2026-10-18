@@ -3,6 +3,7 @@ package codextui
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -34,10 +35,26 @@ func TestFixedTerminalFixtures(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got != string(want) {
+			if got != normalizeFixtureLineEndings(string(want)) {
 				t.Fatalf("fixture changed: %s; inspect before intentionally regenerating", path)
 			}
 		})
+	}
+}
+
+// Git may check text fixtures out as CRLF on Windows. Compare terminal frames,
+// not checkout line endings, without ignoring any other whitespace or styles.
+func normalizeFixtureLineEndings(s string) string { return strings.ReplaceAll(s, "\r\n", "\n") }
+
+func TestFixtureLineEndings(t *testing.T) {
+	want := "\x1b[35mframe\x1b[m  \nnext\n"
+	for _, s := range []string{want, strings.ReplaceAll(want, "\n", "\r\n")} {
+		if normalizeFixtureLineEndings(s) != want {
+			t.Fatal("fixture normalization changed frame content")
+		}
+	}
+	if normalizeFixtureLineEndings("single\rcarriage") != "single\rcarriage" {
+		t.Fatal("normalization hid a non-CRLF difference")
 	}
 }
 
