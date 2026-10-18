@@ -32,6 +32,9 @@ type Capabilities struct {
 }
 
 type Config struct {
+	// Runtime changes presentation labels only; the host owns all I/O and input.
+	// The zero value preserves the display-only preview.
+	Runtime       bool
 	Workspace     string
 	Model         string
 	Capabilities  Capabilities

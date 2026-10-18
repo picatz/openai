@@ -1,0 +1,32 @@
+  [1;35mopenai codex[m  /  WORKSPACE                                                                                            
+  /synthetic/workspace  ·  Configured model: test-model                                                                 
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
+    Keep cancellation honest               │ [1;35mFILES[m  [32m[completed][m                                                         
+    plan [32m[completed][m                       │ Tighten session shutdown                                                   
+    go test ./internal/codexworkspace      │                                                                            
+    command [32m[completed][m                    │ update  internal/codexworkspace/run.go                                     
+  [1;35m> Tighten session shutdown[m               │                                                                            
+    files [32m[completed][m                      │ DIFF · supplied snapshot                                                   
+    Summary                                │ [1;35m@@ -1,3 +1,4 @@[m                                                            
+    message [1;35m[running][m                      │  func shutdown() {                                                         
+                                           │ [31m-    forceKill()[m                                                           
+                                           │ [32m+    requestQuit()[m                                                         
+                                           │ [32m+    closeSession()[m                                                        
+                                           │  }                                                                         
+                                           │                                                                            
+                                           │                                                                            
+                                           │                                                                            
+                                           │                                                                            
+                                           │                                                                            
+                                           │                                                                            
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
+  Item 3/4 · Focus: items · running                                                                                     
+  APP-SERVER · current turn · approvals/input unsupported                                                               
+  Tab focus · PgUp/PgDn scroll · F6 composer · F1 help                                                                  
+  COMPOSER · Running
+  [37m› [mExplain the remaining trade-offs.                                                                                 
+  [40m[37m› [m[m[40mKeep the terminal cleanup bounded.[m[40m[7;37m [m[m[40m[m[40m                                                                               [m
+  [37m› [m[30m                                                                                                                  [m
+  Unsupported approval request rejected; no permission was granted.
+  Enter send · Alt+Enter/Ctrl+J newline · F6 workspace · F1 help
+  Ctrl+C interrupt · Ctrl+Q close locally · draft is not saved

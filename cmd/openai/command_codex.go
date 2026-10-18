@@ -18,7 +18,8 @@ func newCodexCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "codex",
 		Short: "Run the separately installed Codex CLI",
-		Long: `Run non-interactive Codex turns using the installed codex executable.
+		Long: `Run Codex turns using the installed codex executable.
+Use exec for one non-interactive turn or tui for an interactive fresh-thread workspace.
 Codex configuration, authentication, and permission defaults remain in effect.
 This command cannot answer interactive approval requests. Runs may incur charges.`,
 		Args: cobra.NoArgs,
@@ -122,6 +123,6 @@ and local-session flags are unsupported and are rejected when explicitly set.`,
 	}
 	execCmd.Flags().StringVarP(&directory, "cd", "C", "", "Working directory for Codex (default: current directory)")
 	execCmd.Flags().StringVar(&resumeID, "resume", "", "Continue an explicit Codex thread ID; not an openai local session ID")
-	cmd.AddCommand(execCmd)
+	cmd.AddCommand(execCmd, newCodexTUICommand(&model, &timeout))
 	return cmd
 }

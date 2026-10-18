@@ -1,4 +1,7 @@
-# Codex workspace TUI: bounded first slice
+# Codex workspace TUI: display foundation
+
+This document records the earlier presentation-only foundation. The integrated
+`openai codex tui` command is described in [Interactive Codex workspace](codex-tui-runtime.md).
 
 ## Status and recommendation
 

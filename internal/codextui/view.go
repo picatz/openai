@@ -18,6 +18,9 @@ func fit(s string, width int) string {
 
 func (m Model) renderDetail() string {
 	if len(m.items) == 0 {
+		if m.cfg.Runtime {
+			return "A clear view of the work.\n\nSubmit a prompt below. Messages, commands, tools, plans, and changed files appear here as events arrive.\n\nApproval and input requests are unsupported in this workspace."
+		}
 		return "A clear view of the work.\n\nMessages, commands, tools, and changed files appear here as display events arrive.\n\nThis preview has no agent connection. It cannot submit prompts, execute commands, or answer approvals."
 	}
 	item := m.items[m.selected]
@@ -108,7 +111,12 @@ func (m Model) View() tea.View {
 	if workspace == "" {
 		workspace = "workspace not connected"
 	}
-	lines := []string{m.accent("openai codex") + "  /  WORKSPACE PREVIEW", workspace + "  ·  " + model, strings.Repeat("─", w)}
+	label := "WORKSPACE PREVIEW"
+	if m.cfg.Runtime {
+		label = "WORKSPACE"
+		model = "Configured model: " + model
+	}
+	lines := []string{m.accent("openai codex") + "  /  " + label, workspace + "  ·  " + model, strings.Repeat("─", w)}
 	contentHeight := m.height - 7
 	if m.help {
 		help := []string{"KEYBOARD", "", "↑/↓ or j/k  Select an item", "Tab         Switch item / detail focus", "PgUp/PgDn   Scroll detail", "Ctrl+Home   Top of detail", "Ctrl+End    Follow latest detail", "Home/End    First / last item (item focus)", "? or F1     Toggle this help", "Esc         Close help / focus items", "Ctrl+Q      Quit preview", "", "Display only. No prompts or approvals are sent."}
@@ -159,7 +167,12 @@ func (m Model) View() tea.View {
 	if w < 70 {
 		hints = "↑/↓ · ? help · Ctrl+Q quit"
 	}
-	lines = append(lines, strings.Repeat("─", w), selection+" · Focus: "+focus+" · "+state, "DISPLAY ONLY · no agent connection", hints)
+	source := "DISPLAY ONLY · no agent connection"
+	if m.cfg.Runtime {
+		source = "APP-SERVER · current turn · approvals/input unsupported"
+		hints = "Tab focus · PgUp/PgDn scroll · F6 composer · F1 help"
+	}
+	lines = append(lines, strings.Repeat("─", w), selection+" · Focus: "+focus+" · "+state, source, hints)
 	// No untrusted terminal sequences survive normalization. Bound every frame
 	// by display-cell width, including wide Unicode and a tiny terminal.
 	for i, line := range lines {
