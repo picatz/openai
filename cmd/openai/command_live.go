@@ -34,7 +34,7 @@ func newLiveCommand(app *application) *cobra.Command {
 	var inputPath, outputPath, model, backendModel, voice, instructions, eventLogPath string
 	var rate, backendMaxTokens int
 	var duration, listenAfter time.Duration
-	var controls bool
+	var controls, check bool
 	cmd := &cobra.Command{Use: "live", Short: "Run a bounded GPT-Live session with explicit PCM files", Args: validateLiveArgs, RunE: func(cmd *cobra.Command, args []string) error {
 		if app.webSearch {
 			return fmt.Errorf("web-search tools are not configured in this bounded Live client")
@@ -86,6 +86,16 @@ func newLiveCommand(app *application) *cobra.Command {
 		} else if !os.IsNotExist(err) {
 			return err
 		}
+		if check {
+			if err := validateLiveEventLogPaths(outputPath, eventLogPath); err != nil {
+				return err
+			}
+			return reportLivePreflight(cmd, app.output, livePreflightReport{
+				InputPath: inputPath, InputBytes: info.Size(), OutputPath: outputPath, EventLogPath: eventLogPath,
+				SampleRate: rate, Model: model, BackendModel: backendModel, Voice: voice,
+				BackendMaxOutputTokens: backendMaxTokens, Duration: duration.String(), ListenAfter: listenAfter.String(), Controls: controls,
+			})
+		}
 		output, err := os.CreateTemp(filepath.Dir(outputPath), ".openai-live-*")
 		if err != nil {
 			return err
@@ -97,17 +107,7 @@ func newLiveCommand(app *application) *cobra.Command {
 		var eventFile *os.File
 		var logDone chan error
 		if eventLogPath != "" {
-			if eventLogPath == "-" {
-				return fmt.Errorf("event-log must be a new regular file path")
-			}
-			audioAbs, _ := filepath.Abs(outputPath)
-			logAbs, _ := filepath.Abs(eventLogPath)
-			if audioAbs == logAbs {
-				return fmt.Errorf("event-log and output-pcm must use different paths")
-			}
-			if _, err := os.Lstat(eventLogPath); err == nil {
-				return fmt.Errorf("event log already exists")
-			} else if !os.IsNotExist(err) {
+			if err := validateLiveEventLogPaths(outputPath, eventLogPath); err != nil {
 				return err
 			}
 			eventFile, err = os.CreateTemp(filepath.Dir(eventLogPath), ".openai-live-events-*")
@@ -203,7 +203,12 @@ func newLiveCommand(app *application) *cobra.Command {
 
 Use --duration to limit the Live session. Startup and finalization have separate
 15-second bounds. Inherited --timeout, --legacy, --temporary/-t, --history-dir,
-and --session are not supported. --stream and --web-search must remain disabled.`
+and --session are not supported. --stream and --web-search must remain disabled.
+
+Add --check to validate the same explicit input/output paths and configuration
+offline, without credentials, a connection, output creation, or reading controls.
+It assumes raw mono PCM16 at --sample-rate; audio quality, output writability,
+service access, and devices are not verified. Use --output json for a JSON report.`
 	cmd.Flags().StringVar(&inputPath, "input-pcm", "", "Raw mono PCM16 input file (not WAV)")
 	cmd.Flags().StringVar(&outputPath, "output-pcm", "", "New file for returned raw PCM16 audio")
 	cmd.Flags().StringVar(&model, "model", "gpt-live-1", "Live voice model")
@@ -215,6 +220,7 @@ and --session are not supported. --stream and --web-search must remain disabled.
 	cmd.Flags().DurationVar(&duration, "duration", time.Minute, "Hard session duration limit (maximum 10m)")
 	cmd.Flags().DurationVar(&listenAfter, "listen-after", 5*time.Second, "Time to send silence/listen after input EOF before closing")
 	cmd.Flags().StringVar(&eventLogPath, "event-log", "", "Optional new JSON-lines file for control/transcript/backend events")
+	cmd.Flags().BoolVar(&check, "check", false, "Check local files/configuration offline without starting a session or creating files")
 	cmd.Flags().BoolVar(&controls, "controls", false, "Read mute, unmute, and close commands from stdin")
 	cmd.MarkFlagRequired("input-pcm")
 	cmd.MarkFlagRequired("output-pcm")
