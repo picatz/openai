@@ -14,6 +14,7 @@ const (
 	ItemTypeCommandExecution ItemType = "command_execution"
 	ItemTypeFileChange       ItemType = "file_change"
 	ItemTypeMcpToolCall      ItemType = "mcp_tool_call"
+	ItemTypeCollabToolCall   ItemType = "collab_tool_call"
 	ItemTypeWebSearch        ItemType = "web_search"
 	ItemTypeTodoList         ItemType = "todo_list"
 	ItemTypeError            ItemType = "error"
@@ -130,6 +131,63 @@ type McpToolCallResult struct {
 
 func (i *McpToolCallItem) ItemType() ItemType { return ItemTypeMcpToolCall }
 
+// CollabTool identifies a collaboration tool observed in the exec event stream.
+// Future tool names are retained as strings, even without a named constant.
+type CollabTool string
+
+const (
+	CollabToolSpawnAgent CollabTool = "spawn_agent"
+	CollabToolSendInput  CollabTool = "send_input"
+	CollabToolWait       CollabTool = "wait"
+	CollabToolCloseAgent CollabTool = "close_agent"
+)
+
+// CollabToolCallStatus reflects the state of a collaboration tool invocation.
+// Future status values are retained as strings.
+type CollabToolCallStatus string
+
+const (
+	CollabToolCallStatusInProgress CollabToolCallStatus = "in_progress"
+	CollabToolCallStatusCompleted  CollabToolCallStatus = "completed"
+	CollabToolCallStatusFailed     CollabToolCallStatus = "failed"
+)
+
+// CollabAgentStatus describes an agent's last reported state.
+// Future status values are retained as strings.
+type CollabAgentStatus string
+
+const (
+	CollabAgentStatusPendingInit CollabAgentStatus = "pending_init"
+	CollabAgentStatusRunning     CollabAgentStatus = "running"
+	CollabAgentStatusInterrupted CollabAgentStatus = "interrupted"
+	CollabAgentStatusCompleted   CollabAgentStatus = "completed"
+	CollabAgentStatusErrored     CollabAgentStatus = "errored"
+	CollabAgentStatusShutdown    CollabAgentStatus = "shutdown"
+	CollabAgentStatusNotFound    CollabAgentStatus = "not_found"
+)
+
+// CollabAgentState contains an agent's status and optional result or error text.
+type CollabAgentState struct {
+	Status  CollabAgentStatus `json:"status"`
+	Message *string           `json:"message,omitempty"`
+}
+
+// CollabToolCallItem records a collaboration tool call made by Codex.
+// It provides event observability, not an API for controlling agents.
+type CollabToolCallItem struct {
+	ID                string     `json:"id"`
+	Type              ItemType   `json:"type"`
+	Tool              CollabTool `json:"tool"`
+	SenderThreadID    string     `json:"sender_thread_id"`
+	ReceiverThreadIDs []string   `json:"receiver_thread_ids"`
+	Prompt            *string    `json:"prompt,omitempty"`
+	// AgentsStates is keyed by agent thread ID.
+	AgentsStates map[string]CollabAgentState `json:"agents_states"`
+	Status       CollabToolCallStatus        `json:"status"`
+}
+
+func (i *CollabToolCallItem) ItemType() ItemType { return ItemTypeCollabToolCall }
+
 // WebSearchItem captures a web search initiated by the agent.
 type WebSearchItem struct {
 	ID    string   `json:"id"`
@@ -222,6 +280,12 @@ func UnmarshalThreadItem(data []byte) (ThreadItem, error) {
 		return &item, nil
 	case ItemTypeMcpToolCall:
 		var item McpToolCallItem
+		if err := json.Unmarshal(data, &item); err != nil {
+			return nil, err
+		}
+		return &item, nil
+	case ItemTypeCollabToolCall:
+		var item CollabToolCallItem
 		if err := json.Unmarshal(data, &item); err != nil {
 			return nil, err
 		}

@@ -75,16 +75,45 @@ and [TypeScript exec wrapper](https://github.com/openai/codex/blob/rust-v0.160.1
 This is a source- and fixture-verified compatibility target, not a claim that an
 authenticated Codex session or every historical CLI release was exercised.
 
+Collaboration-tool items are also source- and fixture-verified against
+[rust-v0.163.0's exec JSONL schema](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/exec/src/exec_events.rs#L210-L259)
+on 2026-10-18. The synthetic `testdata/rust-v0.163.0-collab.jsonl` fixture covers
+spawn, send-input, wait, and close-agent observations, including failed calls.
+
 The decoder includes MCP arguments/results/errors, web-search action/results,
-cache-write/reasoning token usage, declined commands, and in-progress patches.
+collaboration calls and agent states, cache-write/reasoning token usage, declined
+commands, and in-progress patches.
 Missing new counters remain zero for older streams. Unknown event types preserve
 an owned complete `ThreadEvent.Raw` payload; they are not treated as today's event
 schema. All decoded events also retain `Raw` so extra fields on known events are
-available. Unknown items (including collaboration-tool items in this increment)
-retain their type and owned bytes in `UnknownThreadItem`, which round-trips its
+available. Unknown items retain their type and owned bytes in
+`UnknownThreadItem`, which round-trips its
 original JSON. Required event envelopes and malformed known field types fail
 rather than being silently treated as success. Invalid JSONL is terminal; blank
 lines, CRLF, large events, and a final line without a newline are supported.
+
+`collab_tool_call` now decodes to `*CollabToolCallItem` rather than
+`*UnknownThreadItem`. It exposes the tool, sender and receiver thread IDs,
+optional prompt, call status, and an `AgentsStates` map keyed by agent thread ID:
+
+```go
+if call, ok := event.Item.(*codex.CollabToolCallItem); ok {
+    fmt.Printf("%s: %s (%d recipients)\n", call.Tool, call.Status, len(call.ReceiverThreadIDs))
+    for id, state := range call.AgentsStates {
+        fmt.Printf("  %s: %s\n", id, state.Status)
+    }
+}
+```
+
+Tool names, call statuses, and agent statuses are string-backed types: newer
+values remain readable even before this package adds named constants. `Prompt`
+and each state's `Message` are `*string`; missing or null values are nil, while
+an explicitly empty string is non-nil. `ThreadEvent.String()` summarizes the
+tool, receiver count, and call status without including prompts or agent messages.
+The complete `ThreadEvent.Raw` retains unknown fields and original JSON values;
+marshaling a known typed item only emits its modeled fields. These items observe
+Codex's collaboration activity; they do not expose agent-control methods or a
+remote-agent service.
 
 [`codex app-server`](https://learn.chatgpt.com/docs/app-server) is a separate,
 bidirectional JSON-RPC protocol with initialization, request IDs, and interactive
