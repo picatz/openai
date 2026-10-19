@@ -1,0 +1,20 @@
+  [1;35mopenai codex[m  /  WORKSPACE            
+  /synthetic/workspace  ·  Configured…  
+  ────────────────────────────────────  
+  [1;35mFILES[m  [32m[completed][m                    
+  Tighten session shutdown              
+                                        
+  update  internal/codexworkspace/run.  
+  go                                    
+                                        
+  ────────────────────────────────────  
+  Item 3/4 · Focus: items · running     
+  APP-SERVER · current turn · approva…  
+  Tab focus · PgUp/PgDn scroll · F6 c…  
+  Running
+  [37m› [mExplain the remaining trade-offs. 
+  [40m[37m› [m[m[40mKeep the terminal cleanup [m[40m        [m
+  [40m[37m› [m[m[40mbounded.[m[40m[7;37m [m[m[40m[m[40m                         [m
+  Unsupported approval request reject…
+  Enter send · F1 help · F6 focus
+  Ctrl+C interrupt · Ctrl+Q quit

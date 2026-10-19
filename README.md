@@ -181,3 +181,20 @@ Muting input does not stop backend work or assistant speech. Ctrl+C requests gra
 Control/transcript/backend events are logged only when `--event-log events.jsonl` selects a new private regular file; audio remains in its selected PCM file. A slow event consumer triggers bounded shutdown rather than blocking the session. An unread stderr pipe cannot block the Live protocol loop. JSON stdout reports whether final usage was confirmed and whether audio was saved. `session.usage.updated` is cumulative, and `session.closed` supplies the final voice duration; backend token usage is kept separately. A socket failure or timeout before `session.closed` is reported as unconfirmed finalization, not successful completion.
 
 Tests cover synthetic PCM, protocol ordering, acknowledged mute/unmute, cancellation/backpressure, final-usage collection, truncation/timeouts, and loopback WebSocket/auth/redirect contracts. Real GPT-Live service behavior, audio quality, microphone access, and playback are untested. See [GPT-Live WebSockets](https://developers.openai.com/api/docs/guides/voice-websockets?api=live) and [session lifecycle](https://developers.openai.com/api/docs/guides/live-conversations).
+
+### Interactive Codex workspace
+
+Run `openai codex tui --cd ./project` in a terminal to open a fresh thread using
+the separately installed Codex app-server. Enter sends a prompt, Alt+Enter or
+Ctrl+J inserts a newline, F6 switches composer/workspace focus, Ctrl+C requests
+interruption of a known active turn, and Ctrl+Q closes the local session.
+
+The current-turn timeline shows streamed messages, command output, file patches,
+plans, and diffs. Installed Codex configuration and persistence remain in effect;
+turns may incur charges. Approval/input requests are rejected with a visible
+notice, so use the native Codex client for those workflows. No existing history
+is read. `--no-color` (or nonempty `NO_COLOR`) and `--reduced-motion` are available.
+
+See [the runtime contract](internal/codexsession/README.md) and
+[workspace controls](docs/codex-tui-runtime.md) for boundaries and synthetic-only
+verification. The existing `openai codex exec` command is unchanged.

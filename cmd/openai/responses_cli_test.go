@@ -19,6 +19,10 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	if os.Getenv("OPENAI_CODEX_TUI_FAKE") == "1" && len(os.Args) == 2 && os.Args[1] == "app-server" {
+		runCodexTUITestHelper()
+		os.Exit(0)
+	}
 	if os.Getenv("OPENAI_CODEX_EXEC_HELPER") == "1" && len(os.Args) > 1 && os.Args[1] == "exec" {
 		runCodexExecTestHelper()
 		os.Exit(0)
