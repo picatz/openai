@@ -1,0 +1,24 @@
+  [1;35mopenai codex[m  /  WORKSPACE PREVIEW                                            
+  ~/work/openai  ·  fixture model                                               
+  ────────────────────────────────────────────────────────────────────────────  
+  [1;35mFILES[m  [32m[completed][m                                                            
+  Workspace presentation                                                        
+                                                                                
+  update  internal/codextui/view.go                                             
+  add  internal/codextui/model_test.go                                          
+                                                                                
+  DIFF · supplied snapshot                                                      
+  [31m--- a/internal/codextui/view.go[m                                               
+  [32m+++ b/internal/codextui/view.go[m                                               
+  [1;35m@@ -1,3 +1,4 @@[m                                                               
+   package codextui                                                             
+  [31m-// Text-only transcript.[m                                                     
+  [32m+// Responsive workspace view.[m                                                
+  [32m+// Keyboard-first, with honest capabilities.[m                                 
+                                                                                
+                                                                                
+                                                                                
+  ────────────────────────────────────────────────────────────────────────────  
+  Item 4/5 · Focus: items · running                                             
+  DISPLAY ONLY · no agent connection                                            
+  ↑/↓ items · Tab focus · PgUp/PgDn scroll · ? help · Ctrl+Q quit               
