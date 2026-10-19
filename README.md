@@ -35,14 +35,14 @@ One-shot creation sets `store: false`. Retrieval/deletion requires an existing r
 
 ## Configuration
 
-All commands use the same SDK client configuration:
+HTTP API commands use the SDK client configuration below. Live uses a separate WebSocket client with its own model and session settings.
 
 - `OPENAI_API_KEY`: API authentication
 - `OPENAI_MODEL` or `--model`: text model (default `gpt-4o`, retained for compatibility)
 - `OPENAI_BASE_URL` or `--base-url`: alternate API base URL
 - `OPENAI_API_URL`: supported legacy base URL alias, only used when `OPENAI_BASE_URL` is absent
 - `OPENAI_ORG_ID` and `OPENAI_PROJECT_ID`: SDK organization/project options
-- `--timeout`: per-request timeout (default `2m`; `0` disables it)
+- `--timeout`: HTTP API request timeout (default `2m`; `0` disables it). Live uses `--duration` instead.
 
 Flags take precedence over environment variables. The image command has its own image-model flag. `--help` and shell completion do not require credentials.
 
@@ -150,10 +150,21 @@ The tests use in-memory mock HTTP transports and a generated silent WAV fixture.
 
 `openai live` is an explicit, headless file-audio client for the GPT-Live primary WebSocket protocol. It does not open a microphone, play speakers, or use the different Realtime API event protocol.
 
+Live accepts the shared API key, organization, project, and base URL configuration, plus `--output`/`-o` for its final report. Its local `--model` selects the Live voice model rather than the text model. Use `--duration` to limit the session; the HTTP-only `--timeout` flag does not apply. Explicitly supplying `--timeout`, `--legacy`, `--temporary`/`-t`, `--history-dir`, or `--session` is an error, even with an empty, false, or default value. Live does not use local chat history. Keep `--stream` and `--web-search` disabled.
+
 ```sh
 openai live --input-pcm input.pcm --output-pcm reply.pcm \
   --sample-rate 24000 --duration 30s --listen-after 5s --output json
 ```
+
+Before starting a session, add `--check` to inspect the same explicit paths and configuration offline:
+
+```sh
+openai live --check --input-pcm input.pcm --output-pcm reply.pcm \
+  --sample-rate 24000 --duration 30s --listen-after 5s --output json
+```
+
+This requires no credentials and makes no network connection. It reads only the selected regular input file's metadata and at most 12 header bytes, rejects the same invalid configuration and obvious WAV/size/sample-boundary errors as a normal run, and checks that output/log paths are new with existing parent directories. It creates no files and does not read `--controls` input. Both PCM paths remain required; omit `--check` to start the session. Text and JSON reports describe the selected settings and explicitly leave credentials, service/model/voice availability, output write permissions, and hardware unverified. Raw PCM's actual encoding, channels, sample rate, and audio quality cannot be inferred from these checks; the format is an assumption, and `--sample-rate` does not resample the input. Successful checks do not guarantee that a later session or file write will succeed.
 
 Input/output are raw mono signed 16-bit little-endian PCM at 16 or 24 kHz, not WAV containers. Convert/resample input beforehand; changing `--sample-rate` does not resample bytes. Input is paced in 20 ms frames. After EOF, the client sends silence for `--listen-after`, then requests a close. The explicit duration limit can cut off a reply; GPT-Live has no output-audio-done event to infer when it is safe to stop listening.
 

@@ -99,6 +99,8 @@ func itemSummary(item ThreadItem) string {
 		return fmt.Sprintf("file_change changes=%d status=%s", len(v.Changes), v.Status)
 	case *McpToolCallItem:
 		return fmt.Sprintf("mcp_tool_call server=%q tool=%q status=%s", v.Server, v.Tool, v.Status)
+	case *CollabToolCallItem:
+		return fmt.Sprintf("collab_tool_call tool=%q receivers=%d status=%s", v.Tool, len(v.ReceiverThreadIDs), v.Status)
 	case *WebSearchItem:
 		return fmt.Sprintf("web_search query=%q", v.Query)
 	case *TodoListItem:

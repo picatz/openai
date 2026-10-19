@@ -39,7 +39,7 @@ func TestUnknownEventAndItemPreserveOwnedBytes(t *testing.T) {
 	if string(event.Raw) != before || event.Type != "future.event" || event.Item != nil {
 		t.Fatalf("unknown event = %+v", event)
 	}
-	raw = []byte(`{"type":"collab_tool_call","tool":"spawn_agent","receiver_thread_ids":["agent-1"],"agents_states":{},"status":"completed"}`)
+	raw = []byte(`{"type":"future_tool_call","tool":"future_tool","receiver_thread_ids":["agent-1"],"agents_states":{},"status":"completed"}`)
 	item, err := UnmarshalThreadItem(raw)
 	if err != nil {
 		t.Fatal(err)
@@ -87,7 +87,7 @@ func TestRustV01601Fixture(t *testing.T) {
 		t.Fatal(err)
 	}
 	stream := &ExecStream{stdout: file}
-	count, unknown := 0, 0
+	count, unknown, collab := 0, 0, 0
 	for event, err := range EventStream(t.Context(), stream) {
 		if err != nil {
 			t.Fatal(err)
@@ -96,11 +96,17 @@ func TestRustV01601Fixture(t *testing.T) {
 		if _, ok := event.Item.(*UnknownThreadItem); ok {
 			unknown++
 		}
+		if item, ok := event.Item.(*CollabToolCallItem); ok {
+			collab++
+			if item.Tool != CollabToolSpawnAgent || item.AgentsStates["fixture-agent"].Status != CollabAgentStatusCompleted {
+				t.Fatalf("collab = %+v", item)
+			}
+		}
 		if event.Type == EventTypeTurnCompleted && (event.Usage.CacheWriteInputTokens != 2 || event.Usage.ReasoningOutputTokens != 1) {
 			t.Fatalf("usage = %+v", event.Usage)
 		}
 	}
-	if count != 9 || unknown != 1 {
-		t.Fatalf("events/unknown items = %d/%d", count, unknown)
+	if count != 9 || unknown != 0 || collab != 1 {
+		t.Fatalf("events/unknown/collab items = %d/%d/%d", count, unknown, collab)
 	}
 }

@@ -27,7 +27,7 @@ type application struct {
 }
 
 // newRootCommand constructs independent command trees. SDK environment defaults
-// (API key, organization, project, base URL) are shared by every operation.
+// (API key, organization, project, base URL) also configure Live's separate client.
 func newRootCommand(options ...option.RequestOption) *cobra.Command {
 	app := &application{model: cmp.Or(os.Getenv("OPENAI_MODEL"), "gpt-4o"),
 		baseURL: cmp.Or(os.Getenv("OPENAI_BASE_URL"), os.Getenv("OPENAI_API_URL"))}
@@ -67,7 +67,7 @@ func newRootCommand(options ...option.RequestOption) *cobra.Command {
 	}
 	root.PersistentFlags().StringVar(&app.model, "model", app.model, "Text model (OPENAI_MODEL)")
 	root.PersistentFlags().StringVar(&app.baseURL, "base-url", app.baseURL, "API base URL (OPENAI_BASE_URL; legacy OPENAI_API_URL)")
-	root.PersistentFlags().DurationVar(&app.timeout, "timeout", 2*time.Minute, "Per-request timeout (0 disables)")
+	root.PersistentFlags().DurationVar(&app.timeout, "timeout", 2*time.Minute, "HTTP API request timeout (0 disables; Live uses --duration)")
 	root.PersistentFlags().StringVarP(&app.output, "output", "o", "text", "Output format: text or json")
 	root.PersistentFlags().BoolVar(&app.stream, "stream", false, "Stream response text; JSON emits one completed response")
 	root.PersistentFlags().BoolVar(&app.webSearch, "web-search", false, "Enable the Responses web search tool")
