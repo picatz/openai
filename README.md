@@ -10,7 +10,7 @@ Requires Go 1.27 or newer.
 go install github.com/picatz/openai/cmd/openai@latest
 ```
 
-Set `OPENAI_API_KEY` in your environment. Obtain a key from the [OpenAI platform](https://platform.openai.com/). Requests use your account and may incur API charges. Never commit keys or paste them into bug reports.
+For API commands, set `OPENAI_API_KEY` in your environment. Obtain a key from the [OpenAI platform](https://platform.openai.com/). Requests use your account and may incur API charges. Never commit keys or paste them into bug reports. `openai codex` uses the separately installed Codex CLI's authentication.
 
 ## Responses
 
@@ -86,7 +86,18 @@ Text mode prints the saved session ID on stderr. Session mode JSON emits `{sessi
 
 `--legacy` preserves the former terminal commands, including file/URL/clipboard expansion and Codex delegation. Those shortcuts are not automatically interpreted by the new text-focused UI.
 
-## Codex Go package
+## Codex
+
+Run a foreground turn with a separately installed and authenticated [Codex CLI](https://github.com/openai/codex):
+
+```sh
+openai codex exec 'Summarize this repository'
+cat question.txt | openai codex exec -
+openai codex exec --cd ./project --timeout 5m --output json 'Explain the test layout'
+openai codex exec --resume THREAD_ID 'Explain the next step'
+```
+
+Text output is the final response; JSON includes `thread_id`, `final_response`, and `usage`. Codex selects its model unless you pass `--model`. Its configured permissions are unchanged. This non-interactive command cannot answer approval requests. See the [CLI guide](docs/codex-cli.md) for input, configuration, deadlines, and limitations. Runs may incur charges.
 
 The [`codex` package](codex/README.md) wraps `codex exec --json`, with resumable threads, structured output, cancellation, and forward-compatible events. It requires a separately installed Codex CLI. See the package guide for permission options, compatibility scope, and stream cleanup.
 
